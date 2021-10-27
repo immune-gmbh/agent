@@ -1,0 +1,60 @@
+name: Unit tests (agent)
+on:
+  pull_request: {}
+jobs:
+  agent:
+    runs-on: ${{ matrix.sys.os }}
+    strategy:
+      matrix:
+        sys:
+          - { os: ubuntu-18.04, shell: bash, cgo_ldlags: "" }
+          - { os: windows-2019, shell: "msys2 {0}", cgo_ldlags: "-lssp" }
+    env:
+      OS: ${{ matrix.sys.os }}
+      CGO_LDFLAGS: ${{ matrix.sys.cgo_ldlags }}
+    defaults:
+      run:
+        shell: ${{ matrix.sys.shell }}
+        working-directory: ./
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          lfs: true
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.16"
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+            ~/Library/Caches/go-build
+            %LocalAppData%\go-build
+          key: ${{ runner.os }}-agent-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-agent-
+      - name: Set up CGO environment for windows
+        if: ${{ runner.os == 'Windows' }}
+        uses: msys2/setup-msys2@v2
+        with:
+          release: false
+          path-type: inherit
+          install: gcc openssl-devel gcc-libs
+      - name: Build apps and test suite
+        run: |
+          make ${{ runner.os }}
+      - name: Run unit and system tests
+        run: |
+          make test
+      - name: Run license checker
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          make license-check
+      - uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: agent
+          env_vars: OS
+          directory: ./
