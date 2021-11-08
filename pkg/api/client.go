@@ -232,7 +232,7 @@ func (c *Client) doGet(ctx context.Context, route string, ifModifiedSince *time.
 	}
 
 	if ifModifiedSince != nil {
-		req.Header.Set("If-Modified-Since", ifModifiedSince.Format(time.RFC1123))
+		req.Header.Set("If-Modified-Since", ifModifiedSince.UTC().Format(http.TimeFormat))
 	}
 
 	log.Debugf("GET %s", endpoint.String())
