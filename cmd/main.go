@@ -19,6 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	tpm1 "github.com/google/go-tpm/tpm"
+	"github.com/google/go-tpm/tpm2"
 	"github.com/immune-gmbh/agent/v2/pkg/api"
 	"github.com/immune-gmbh/agent/v2/pkg/attestation"
 	"github.com/immune-gmbh/agent/v2/pkg/firmware"
@@ -206,9 +207,23 @@ func (report *reportCmd) Run(glob *globalOptions) error {
 		fwProps = api.FirmwareProperties{}
 	}
 
-	fwPropsJSON, err := json.Marshal(fwProps)
+	// read PCRs
+	pcrValues, err := glob.Anchor.PCRValues(tpm2.Algorithm(glob.State.Config.PCRBank), glob.State.Config.PCRs)
 	if err != nil {
-		logrus.Debugf("json.Marshal(FirmwareProperties): %s", err.Error())
+		logrus.Debugf("tcg.PCRValues(glob.TpmConn, pcrSel): %s", err.Error())
+		logrus.Error("Failed read all PCR values")
+		return err
+	}
+
+	// serialize
+	evidence := api.Evidence{
+		Type:     api.EvidenceType,
+		PCRs:     pcrValues,
+		Firmware: fwProps,
+	}
+	evidenceJSON, err := json.Marshal(evidence)
+	if err != nil {
+		logrus.Debugf("json.Marshal(Evidence): %s", err.Error())
 		logrus.Fatalf("Internal error while encoding firmware state. This is a bug, please report it to bugs@immu.ne.")
 	}
 
@@ -222,12 +237,12 @@ func (report *reportCmd) Run(glob *globalOptions) error {
 			return err
 		}
 		path := abs + "/" + host + ".json"
-		if err := ioutil.WriteFile(path, fwPropsJSON, 0644); err != nil {
+		if err := ioutil.WriteFile(path, evidenceJSON, 0644); err != nil {
 			return err
 		}
 		logrus.Infof("Report created: %s", path)
 	} else {
-		fmt.Println(string(fwPropsJSON))
+		fmt.Println(string(evidenceJSON))
 	}
 
 	return nil

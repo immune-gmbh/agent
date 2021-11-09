@@ -184,8 +184,8 @@ const EvidenceType = "evidence/1"
 // /v2/attest (apisrv)
 type Evidence struct {
 	Type      string             `jsonapi:"attr,type" json:"type"`
-	Quote     Attest             `jsonapi:"attr,quote" json:"quote"`
-	Signature Signature          `jsonapi:"attr,signature" json:"signature"`
+	Quote     *Attest            `jsonapi:"attr,quote,omitempty" json:"quote,omitempty"`
+	Signature *Signature         `jsonapi:"attr,signature,omitempty" json:"signature,omitempty"`
 	Algorithm string             `jsonapi:"attr,algorithm" json:"algorithm"`
 	PCRs      map[string]Buffer  `jsonapi:"attr,pcrs" json:"pcrs"`
 	Firmware  FirmwareProperties `jsonapi:"attr,firmware" json:"firmware"`

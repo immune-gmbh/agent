@@ -110,8 +110,8 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	cookie, _ := api.Cookie(rand.Reader)
 	evidence := api.Evidence{
 		Type:      api.EvidenceType,
-		Quote:     quote,
-		Signature: sig,
+		Quote:     &quote,
+		Signature: &sig,
 		Algorithm: strconv.Itoa(int(st.Config.PCRBank)),
 		PCRs:      pcrValues,
 		Firmware:  fwProps,
