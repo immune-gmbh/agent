@@ -10,7 +10,7 @@ import (
 	"testing"
 	"testing/quick"
 
-	"github.com/google/go-tpm-tools/tpm2tools"
+	"github.com/google/go-tpm-tools/client"
 	"github.com/google/go-tpm/tpm2"
 
 	test "github.com/immune-gmbh/agent/v2/internal/testing"
@@ -133,7 +133,7 @@ func TestQNameIntegration(t *testing.T) {
 	}
 
 	conn := test.GetTpmSimulator(t)
-	defer tpm2tools.CheckedClose(t, conn)
+	defer client.CheckedClose(t, conn)
 
 	// TPM2_CreatePrimary: create the key
 	rootTemplate := tpm2.Public{

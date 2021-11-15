@@ -10,7 +10,7 @@ DEPS-CLIENT:=$(SRCS-CLIENT) pkg/**/*.go
 RELEASE_ID?=$(shell git describe --tags)
 GO_ENV:=CGO_ENABLED=0 GOARCH=amd64
 CGO_ENV:=CGO_ENABLED=1 GOARCH=amd64
-LDFLAGS:=-X main.releaseId=$(RELEASE_ID) -w $(LDFLAGS_EXTRA)
+LDFLAGS:=-X main.releaseId=$(RELEASE_ID) -s -w $(LDFLAGS_EXTRA)
 LDFLAGS-STATIC:=$(LDFLAGS) -extldflags "-static"
 
 # suppress lots of legacy SCCS and RCS lookups

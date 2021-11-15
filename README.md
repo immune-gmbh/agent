@@ -9,6 +9,9 @@ Build
 -----
 The service is written on Go and needs version 1.16 of later to be build.
 
+You need to have git lfs installed for windows builds. Install with "git lfs install"
+and run "git lfs pull" once and in future the next regular fetch and pull will do it.
+
 Building the binary can be done with GNU Make:
 
 ```bash
