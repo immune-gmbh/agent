@@ -64,7 +64,7 @@ test:
 
 .PHONY: license-check
 license-check: deps
-	go-licenses --logtostderr check --exclude-restricted cmd/
+	go-licenses --logtostderr check --exclude-restricted $(SRCS-CLIENT)
 
 # disable many builtin rules
 .SUFFIXES:
