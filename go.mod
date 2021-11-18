@@ -23,5 +23,5 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	golang.org/x/sys v0.0.0-20211113001501-0c823b97ae02
-	gotest.tools/gotestsum v1.7.0
+	golang.org/x/tools v0.1.0 // indirect
 )
