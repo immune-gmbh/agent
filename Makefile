@@ -1,6 +1,6 @@
 # command names
 GO:=go
-GOTEST:=$(GO) test -v
+GOTEST=gotestsum
 
 # build artifacts, sources
 SRCS-CLIENT:=cmd/main.go 
@@ -31,6 +31,7 @@ deps:
 	@echo "Fetching and installing dependencies.."
 	@$(GO) mod download
 	@$(GO) install github.com/tc-hib/go-winres@latest
+	@$(GO) install gotest.tools/gotestsum@latest
 	@$(GO) install github.com/immune-gmbh/go-licenses
 
 # need to cd into the directory b/c the command doesn't accept output parameter
@@ -59,7 +60,7 @@ clean:
 
 .PHONY: test
 test:
-	$(GOTEST) -coverprofile=coverage.txt -covermode=atomic ./...
+	$(GOTEST) -- -coverprofile=coverage.txt -covermode=atomic ./...
 
 .PHONY: license-check
 license-check: deps
