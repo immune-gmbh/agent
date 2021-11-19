@@ -52,14 +52,15 @@ func TestClient_Configuration(t *testing.T) {
 		}
 	})
 
-	// round time to nearest time value represented by RFC1123
-	modifiedSince, err := time.Parse(time.RFC1123, time.Now().Format(time.RFC1123))
+	// round time to nearest time value represented by chosen time format
+	tf := http.TimeFormat
+	modifiedSince, err := time.Parse(tf, time.Now().Format(tf))
 	assert.NoError(t, err)
 
 	client304 := NewTestClient(func(req *http.Request) *http.Response {
 		modSinceHeader := req.Header.Get("If-modified-since")
 		assert.NotNil(t, modSinceHeader)
-		tm, err := time.Parse(time.RFC1123, modSinceHeader)
+		tm, err := time.Parse(tf, modSinceHeader)
 		assert.NoError(t, err)
 		tm.Equal(modifiedSince)
 
