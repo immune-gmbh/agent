@@ -22,7 +22,7 @@ all: guard-all
 
 # OS-specific make targets are used by Github unit test runners to avoid redundant builds
 # As we don't (yet) have a macOS workflow run we'll cross-compile mac artifacts with Linux
-Linux: deps guard-linux guard-osx guard-linux-sim
+Linux: deps guard-linux guard-osx
 Windows: deps guard-win.exe
 macOS: deps guard-osx
 
@@ -41,9 +41,6 @@ cmd/rsrc_windows_amd64.syso: deps winres/winres.json winres/icon.png winres/icon
 guard-linux: $(DEPS-CLIENT)
 	$(GO_ENV) GOOS=linux   $(GO) build -ldflags '$(LDFLAGS-STATIC)' -o $@ $(SRCS-CLIENT)
 
-guard-linux-sim: $(DEPS-CLIENT)
-	$(CGO_ENV) GOOS=linux   $(GO) build -ldflags '$(LDFLAGS)' -o $@ $(SRCS-CLIENT)
-
 guard-osx: $(DEPS-CLIENT)
 	$(GO_ENV) GOOS=darwin  $(GO) build -ldflags '$(LDFLAGS-STATIC)' -o $@ $(SRCS-CLIENT)
 
@@ -56,7 +53,7 @@ guard-all: Linux Windows macOS
 	
 .PHONY: clean
 clean:
-	rm -f guard-linux guard-osx guard-win.exe guard-linux-sim
+	rm -f guard-linux guard-osx guard-win.exe
 
 .PHONY: test
 test:
