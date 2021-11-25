@@ -1,6 +1,9 @@
 # command names
 GO:=go
-GOTEST=gotestsum
+GOBINDIR:=$(shell go env GOPATH)/bin/
+GOTEST="$(GOBINDIR)/gotestsum"
+GOWINRES="$(GOBINDIR)/go-winres"
+GOLIC="$(GOBINDIR)/go-licenses"
 
 # build artifacts, sources
 SRCS-CLIENT:=cmd/main.go 
@@ -36,7 +39,7 @@ deps:
 
 # need to cd into the directory b/c the command doesn't accept output parameter
 cmd/rsrc_windows_amd64.syso: deps winres/winres.json winres/icon.png winres/icon16.png winres/icon32.png winres/icon48.png
-	cd cmd/; go-winres make --in ../winres/winres.json --arch amd64 --product-version $(RELEASE_ID) --file-version $(RELEASE_ID)
+	cd cmd/; $(GOWINRES) make --in ../winres/winres.json --arch amd64 --product-version $(RELEASE_ID) --file-version $(RELEASE_ID)
 
 guard-linux: $(DEPS-CLIENT)
 	$(GO_ENV) GOOS=linux   $(GO) build -ldflags '$(LDFLAGS-STATIC)' -o $@ $(SRCS-CLIENT)
@@ -56,12 +59,12 @@ clean:
 	rm -f guard-linux guard-osx guard-win.exe
 
 .PHONY: test
-test:
+test: deps
 	$(GOTEST) -- -coverprofile=coverage.txt -covermode=atomic ./...
 
 .PHONY: license-check
 license-check: deps
-	go-licenses --logtostderr check --exclude-restricted $(SRCS-CLIENT)
+	$(GOLIC) --logtostderr check --exclude-restricted $(SRCS-CLIENT)
 
 # disable many builtin rules
 .SUFFIXES:
