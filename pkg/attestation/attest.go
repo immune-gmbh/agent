@@ -133,6 +133,9 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	} else if errors.Is(err, api.ServerError) {
 		log.Error("Attestation failed. The immune Guard server failed to process the request. Please try again later.")
 		return nil, err
+	} else if errors.Is(err, api.PaymentError) {
+		log.Error("Attestation failed. A payment is required to use the attestation service.")
+		return nil, err
 	} else if err != nil {
 		log.Error("Attestation failed. An unknown error occured. Please try again later.")
 		return nil, err
