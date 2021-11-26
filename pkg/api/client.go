@@ -18,7 +18,6 @@ import (
 
 	"github.com/google/jsonapi"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -26,6 +25,7 @@ var (
 	NetworkError = errors.New("Connection error")
 	AuthError    = errors.New("Authentication token invalid")
 	FormatError  = errors.New("Data invalid")
+	PaymentError = errors.New("Payment required")
 )
 
 func Cookie(rng io.Reader) (string, error) {
@@ -211,7 +211,7 @@ func (c *Client) doPost(ctx context.Context, route string, doc interface{}) (jso
 	if err != nil {
 		return nil, FormatError
 	}
-	log.Debugf("POST %s", endpoint.String())
+	logrus.Debugf("POST %s", endpoint.String())
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), pipe)
 	if err != nil {
@@ -235,7 +235,7 @@ func (c *Client) doGet(ctx context.Context, route string, ifModifiedSince *time.
 		req.Header.Set("If-Modified-Since", ifModifiedSince.UTC().Format(http.TimeFormat))
 	}
 
-	log.Debugf("GET %s", endpoint.String())
+	logrus.Debugf("GET %s", endpoint.String())
 	return c.doRequest(req)
 }
 
@@ -246,50 +246,65 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		log.Debugf("HTTP response: %s", err)
+		logrus.Debugf("HTTP response: %s", err)
 		return nil, NetworkError
 	}
+	defer resp.Body.Close()
 
 	code := resp.StatusCode
-	if code >= 400 {
-		log.Debugf("HTTP code %d", code)
+	logrus.Debugf("HTTP status: %d", code)
+
+	var readBody bool
+	var retErr error
+	debugging := logrus.GetLevel() == logrus.TraceLevel
+
+	switch {
+	case code == 304:
+		// server tells us to use cached response and sends no body
+		retErr = nil
+		readBody = false
+	case code <= 400:
+		retErr = nil
+		readBody = true
+	case code == 401:
+		retErr = AuthError
+		readBody = debugging
+	case code == 402:
+		retErr = PaymentError
+		readBody = debugging
+	case code < 500:
+		retErr = FormatError
+		readBody = debugging
+	case code < 600:
+		retErr = ServerError
+		readBody = debugging
+	default:
+		retErr = fmt.Errorf("unexpected HTTP status code: %d", code)
+		readBody = false
 	}
 
-	// translate HTTP status code to error
-	if code == 304 {
-		// server tells us to use cached response and sends no body
-		return nil, nil
-	} else if code <= 400 {
-		defer resp.Body.Close()
-
+	if readBody {
 		respBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Debugf("Reading server response: %s", err)
+			logrus.Debugf("Reading server response: %s", err)
 			return nil, NetworkError
 		}
 
-		log.Debugf("HTTP %d: %s", resp.StatusCode, string(respBytes))
+		logrus.Debugf("HTTP body: %s", string(respBytes))
 
 		var one jsonapi.OnePayload
 		if err = json.Unmarshal(respBytes, &one); err != nil {
 			var many jsonapi.ManyPayload
 			if err = json.Unmarshal(respBytes, &many); err != nil {
-				log.Debugf("Parsing server response: %s", err)
+				logrus.Debugf("Parsing server response: %s", err)
 				return nil, ServerError
 			} else {
-				return &many, nil
+				return &many, retErr
 			}
 		} else {
-			return &one, nil
+			return &one, retErr
 		}
-	} else if code < 500 {
-		switch code {
-		case 401:
-			return nil, AuthError
-		default:
-			return nil, FormatError
-		}
-	} else {
-		return nil, ServerError
 	}
+
+	return nil, retErr
 }

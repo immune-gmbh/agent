@@ -116,6 +116,9 @@ func Enroll(ctx context.Context, client *api.Client, token string, endorsementAu
 	} else if errors.Is(err, api.ServerError) {
 		log.Error("Enrollment failed. The immune Guard server failed to process the request. Please try again later.")
 		return err
+	} else if errors.Is(err, api.PaymentError) {
+		log.Error("Enrollment failed. A payment is required for further enrollments.")
+		return err
 	} else if err != nil {
 		log.Error("Enrollment failed. An unknown error occured. Please try again later.")
 		return err
