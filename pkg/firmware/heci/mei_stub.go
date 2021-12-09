@@ -24,6 +24,6 @@ func (m *meiClient) write(p []byte) (int, error) {
 	return 0, errors.New("heci.meiClient.write not implemented on " + runtime.GOOS)
 }
 
-func (m *meiClient) read(p []byte) (int, error) {
+func (m *meiClient) read(p []byte, timeoutMs uint) (int, error) {
 	return 0, errors.New("heci.meiClient.read not implemented on " + runtime.GOOS)
 }

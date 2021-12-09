@@ -2,9 +2,9 @@
 package heci
 
 import (
+	"errors"
 	"fmt"
 	"syscall"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -18,24 +18,30 @@ type meiClient struct {
 
 func (m *meiClient) runCommand(command []byte) ([]byte, error) {
 	var err error
-	for i := 0; i < 3; i++ {
-		if _, err = m.write(command); err != nil {
-			return nil, fmt.Errorf("write to MEI failed: %w", err)
-		}
 
-		buf := make([]byte, m.maxMsgLength)
-		n, err := m.read(buf)
-		if err == syscall.EINTR {
-			time.Sleep(time.Millisecond * 100 << i)
-			continue
-		}
-		if err != nil {
-			break
-		}
-
-		return buf[:n], nil
+	if _, err = m.write(command); err != nil {
+		return nil, fmt.Errorf("write to MEI failed: %w", err)
 	}
-	return nil, fmt.Errorf("read from MEI failed: %w", err)
+
+	buf := make([]byte, m.maxMsgLength)
+
+	// retry on timeout or EINTR, EAGAIN, etc
+	// the mei interface returns with a zero-length read to indicate end-of-message
+	for retry := 3; retry > 0; {
+		var n int
+		n, err = m.read(buf, 100)
+		if err != nil {
+			var tmpErr syscall.Errno
+			if errors.As(err, &tmpErr) && tmpErr.Timeout() {
+				retry--
+				continue
+			}
+			return nil, fmt.Errorf("read from MEI failed: %w", err)
+		}
+
+		return buf[0:n], nil
+	}
+	return nil, fmt.Errorf("read from MEI timed out: %w", err)
 }
 
 // stop-gap for https://github.com/google/uuid/pull/75
