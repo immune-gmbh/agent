@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/google/uuid"
@@ -65,7 +66,22 @@ func (m *meiClient) write(p []byte) (int, error) {
 	return syscall.Write(*m.handle, p)
 }
 
-func (m *meiClient) read(p []byte) (int, error) {
+func (m *meiClient) read(p []byte, timeoutMs uint) (int, error) {
+	var r syscall.FdSet
+	fd := *m.handle
+	r.Bits[fd/64] = 1 << (fd % 64)
+	tv := syscall.NsecToTimeval(int64(time.Millisecond * time.Duration(timeoutMs)))
+
+	// use a select for reading as seen in the official metee library
+	// this should allow us to read messages < page_size in one go
+	n, err := syscall.Select(int(fd+1), &r, nil, nil, &tv)
+	if err != nil {
+		return 0, err
+	}
+	if n == 0 {
+		return 0, syscall.ETIMEDOUT
+	}
+
 	// use syscall.Read instead of m.fd.Read to avoid epoll
-	return syscall.Read(*m.handle, p)
+	return syscall.Read(fd, p)
 }

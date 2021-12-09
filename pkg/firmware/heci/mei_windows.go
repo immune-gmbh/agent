@@ -4,7 +4,9 @@ package heci
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"math"
 	"syscall"
 	"unsafe"
 
@@ -84,11 +86,71 @@ func (m *meiClient) close() error {
 }
 
 func (m *meiClient) write(p []byte) (int, error) {
-	return windows.Write(windows.Handle(m.handle), p)
+	ovlpd := windows.Overlapped{}
+	hevt, err := windows.CreateEvent(nil, 1, 0, nil)
+	if err != nil {
+		return 0, err
+	}
+	ovlpd.HEvent = windows.Handle(hevt)
+	defer windows.CloseHandle(hevt)
+
+	h := windows.Handle(m.handle)
+	var schnilch uint32
+	err = windows.WriteFile(h, p, &schnilch, &ovlpd)
+	if err != nil && !errors.Is(err, syscall.ERROR_IO_PENDING) {
+		return 0, err
+	}
+
+	_, err = windows.WaitForSingleObject(ovlpd.HEvent, windows.INFINITE)
+	if err != nil {
+		return 0, err
+	}
+
+	var done uint32
+	err = windows.GetOverlappedResult(h, &ovlpd, &done, true)
+	if err != nil {
+		return 0, err
+	}
+	if done > math.MaxInt32 {
+		return 0, errors.New("write too large")
+	}
+
+	return int(done), nil
 }
 
-func (m *meiClient) read(p []byte) (int, error) {
-	return windows.Read(windows.Handle(m.handle), p)
+func (m *meiClient) read(p []byte, timeoutMs uint) (int, error) {
+	ovlpd := windows.Overlapped{}
+	hevt, err := windows.CreateEvent(nil, 1, 0, nil)
+	if err != nil {
+		return 0, err
+	}
+	ovlpd.HEvent = windows.Handle(hevt)
+	defer windows.CloseHandle(hevt)
+
+	h := windows.Handle(m.handle)
+	err = windows.ReadFile(h, p, nil, &ovlpd)
+	if err != nil && !errors.Is(err, syscall.ERROR_IO_PENDING) {
+		return 0, err
+	}
+
+	r, err := windows.WaitForSingleObject(ovlpd.HEvent, uint32(timeoutMs))
+	if err != nil {
+		return 0, err
+	}
+	if r != windows.WAIT_OBJECT_0 {
+		return 0, syscall.ETIMEDOUT
+	}
+
+	var done uint32
+	err = windows.GetOverlappedResult(h, &ovlpd, &done, false)
+	if err != nil {
+		return 0, err
+	}
+	if done > math.MaxInt32 {
+		return 0, errors.New("read too large")
+	}
+
+	return int(done), nil
 }
 
 func openHECIDevice(devicePath string) (handle windows.Handle, err error) {
@@ -103,7 +165,7 @@ func openHECIDevice(devicePath string) (handle windows.Handle, err error) {
 		0,
 		nil,
 		windows.OPEN_EXISTING,
-		windows.FILE_ATTRIBUTE_NORMAL,
+		windows.FILE_FLAG_OVERLAPPED,
 		nullHandle)
 
 	return
@@ -148,14 +210,28 @@ func getHECIDevicePath() (string, error) {
 }
 
 func connectClientGUID(handle windows.Handle, guid uuid.UUID) (outBuf []byte, err error) {
-	var bytesReturned uint32
-	bytes := 16
-	outBuf = make([]byte, bytes)
-	data := littleEndianUUID(guid)
-	err = windows.DeviceIoControl(handle, IOCTL_CONNECT_CLIENT, &data[0], uint32(len(data)), &outBuf[0], uint32(bytes), &bytesReturned, nil)
+	ovlpd := windows.Overlapped{}
+	hevt, err := windows.CreateEvent(nil, 1, 0, nil)
 	if err != nil {
 		return
 	}
+	ovlpd.HEvent = windows.Handle(hevt)
+	defer windows.CloseHandle(hevt)
+
+	bytes := 16
+	outBuf = make([]byte, bytes)
+	data := littleEndianUUID(guid)
+	err = windows.DeviceIoControl(handle, IOCTL_CONNECT_CLIENT, &data[0], uint32(len(data)), &outBuf[0], uint32(bytes), nil, &ovlpd)
+	if err != nil && !errors.Is(err, syscall.ERROR_IO_PENDING) {
+		return
+	}
+
+	var bytesReturned uint32
+	err = windows.GetOverlappedResult(handle, &ovlpd, &bytesReturned, true)
+	if err != nil {
+		return
+	}
+
 	outBuf = outBuf[:bytesReturned]
 	return
 }
