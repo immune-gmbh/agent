@@ -142,7 +142,7 @@ func (m *meiClient) read(p []byte, timeoutMs uint) (int, error) {
 	}
 
 	var done uint32
-	err = windows.GetOverlappedResult(h, &ovlpd, &done, false)
+	err = windows.GetOverlappedResult(h, &ovlpd, &done, true)
 	if err != nil {
 		return 0, err
 	}
@@ -213,6 +213,7 @@ func connectClientGUID(handle windows.Handle, guid uuid.UUID) (outBuf []byte, er
 	ovlpd := windows.Overlapped{}
 	hevt, err := windows.CreateEvent(nil, 1, 0, nil)
 	if err != nil {
+		err = fmt.Errorf("can't create event: %w", err)
 		return
 	}
 	ovlpd.HEvent = windows.Handle(hevt)
@@ -223,12 +224,18 @@ func connectClientGUID(handle windows.Handle, guid uuid.UUID) (outBuf []byte, er
 	data := littleEndianUUID(guid)
 	err = windows.DeviceIoControl(handle, IOCTL_CONNECT_CLIENT, &data[0], uint32(len(data)), &outBuf[0], uint32(bytes), nil, &ovlpd)
 	if err != nil && !errors.Is(err, syscall.ERROR_IO_PENDING) {
+		err = fmt.Errorf("IOCTL_CONNECT_CLIENT: %w", err)
 		return
 	}
 
 	var bytesReturned uint32
 	err = windows.GetOverlappedResult(handle, &ovlpd, &bytesReturned, true)
+	if err == windows.ERROR_INVALID_HANDLE {
+		err = fmt.Errorf("me client not found: %w", err)
+		return
+	}
 	if err != nil {
+		err = fmt.Errorf("ioctl get result: %w", err)
 		return
 	}
 
