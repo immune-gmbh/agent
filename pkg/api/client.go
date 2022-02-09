@@ -20,6 +20,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const DefaultHTTPRequestTimeoutSec = 30
+const DefaultPostRequestTimeoutSec = 60
+
 var (
 	ServerError  = errors.New("API server error")
 	NetworkError = errors.New("Connection error")
@@ -40,9 +43,11 @@ func Cookie(rng io.Reader) (string, error) {
 }
 
 type Client struct {
-	HTTP *http.Client
-	Base *url.URL
-	Auth string
+	HTTP               *http.Client
+	Base               *url.URL
+	Auth               string
+	HTTPRequestTimeout time.Duration // Timeout for all HTTP requests except POST
+	PostRequestTimeout time.Duration // POST requests may contain lots of data and need a different timeout
 }
 
 func NewClient(base *url.URL, ca *x509.Certificate) Client {
@@ -57,8 +62,10 @@ func NewClient(base *url.URL, ca *x509.Certificate) Client {
 	}
 
 	return Client{
-		HTTP: &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}},
-		Base: base,
+		HTTP:               &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}},
+		Base:               base,
+		HTTPRequestTimeout: time.Second * DefaultHTTPRequestTimeoutSec,
+		PostRequestTimeout: time.Second * DefaultPostRequestTimeoutSec,
 	}
 }
 
@@ -167,7 +174,7 @@ func (c *Client) Post(ctx context.Context, route string, doc interface{}) (jsona
 	var ev jsonapi.Payloader
 
 	for i := 0; i < 3; i += 1 {
-		ctx, cancel := context.WithTimeout(ctx, time.Second*60)
+		ctx, cancel := context.WithTimeout(ctx, c.PostRequestTimeout)
 		defer cancel()
 		ev, err = c.doPost(ctx, route, doc)
 
@@ -190,7 +197,7 @@ func (c *Client) Get(ctx context.Context, route string, ifModifiedSince *time.Ti
 	var ev jsonapi.Payloader
 
 	for i := 0; i < 3; i += 1 {
-		ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+		ctx, cancel := context.WithTimeout(ctx, c.HTTPRequestTimeout)
 		defer cancel()
 		ev, err = c.doGet(ctx, route, ifModifiedSince)
 
