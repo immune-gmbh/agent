@@ -2,7 +2,6 @@ package heci
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/immune-gmbh/agent/v2/pkg/api"
 	"github.com/immune-gmbh/agent/v2/pkg/firmware/common"
@@ -31,24 +30,26 @@ type MECommandIntf interface {
 	close() error
 }
 
-func reportMEClientCommands(command *api.MEClientCommands) (err error) {
+func reportMEClientCommands(command *api.MEClientCommands) error {
 	m, err := openMEClientInterface(command)
 	if err != nil {
-		return
+		return err
 	}
 	defer m.close()
 
-	for i, v := range command.Commands {
+	for i := range command.Commands {
+		v := &command.Commands[i]
 		var buf []byte
-		buf, err = m.runCommand(v.Command)
+		buf, err := m.runCommand(v.Command)
 		if err != nil {
-			err = fmt.Errorf("error running cmd: %w", err)
-			break
+			v.Error = common.ServeApiError(common.MapFSErrors(err))
+			logrus.Tracef("heci.reportMEClientCommands(): cmd #%v %s", i, err.Error())
+			continue
 		}
-		command.Commands[i].Response = buf
+		v.Response = buf
 	}
 
-	return
+	return nil
 }
 
 func ReportMECommands(commands []api.MEClientCommands) (err error) {
