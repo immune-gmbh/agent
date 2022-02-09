@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -214,7 +215,10 @@ func (c *Client) doPost(ctx context.Context, route string, doc interface{}) (jso
 	endpoint.Path = path.Join(endpoint.Path, route)
 
 	pipe := new(bytes.Buffer)
-	err := json.NewEncoder(pipe).Encode(doc)
+	gz := gzip.NewWriter(pipe)
+	err := json.NewEncoder(gz).Encode(doc)
+	gz.Flush()
+
 	if err != nil {
 		return nil, FormatError
 	}
@@ -225,6 +229,7 @@ func (c *Client) doPost(ctx context.Context, route string, doc interface{}) (jso
 		return nil, FormatError
 	}
 	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Content-Encoding", "gzip")
 
 	return c.doRequest(req)
 }
