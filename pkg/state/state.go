@@ -34,7 +34,7 @@ var (
 type State StateV3
 type DeviceKey DeviceKeyV3
 
-func (s *State) EnsureFresh(cl *api.Client) error {
+func (s *State) EnsureFresh(cl *api.Client) (bool, error) {
 	return (*StateV3)(s).EnsureFresh(cl)
 }
 

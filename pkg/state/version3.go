@@ -47,21 +47,24 @@ type StateV3 struct {
 	Config     api.Configuration `json:"config"`
 }
 
-func (s *StateV3) EnsureFresh(cl *api.Client) error {
+// returns true if a new config was fetched
+func (s *StateV3) EnsureFresh(cl *api.Client) (bool, error) {
 	ctx := context.Background()
 	now := time.Now()
 	cfg, err := cl.Configuration(ctx, &s.LastUpdate)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// if cfg is nil then there is no new config and we should use a cached version
 	if cfg != nil {
 		s.Config = *cfg
 		s.LastUpdate = now
+
+		return true, nil
 	}
 
-	return nil
+	return false, nil
 }
 
 func (s *StateV3) IsEnrolled() bool {
