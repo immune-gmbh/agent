@@ -263,9 +263,18 @@ func loadFreshState(stateDir string, glob *globalOptions) error {
 		glob.State = st
 	}
 
-	if err := glob.State.EnsureFresh(&glob.Client); err != nil {
+	update, err := glob.State.EnsureFresh(&glob.Client)
+	if err != nil {
 		logrus.Debugf("Fetching fresh config: %s", err)
 		return err
+	}
+
+	if update {
+		logrus.Debugf("Storing new config from server")
+		if err := glob.State.Store(path.Join(cli.StateDir, "keys")); err != nil {
+			logrus.Debugf("Store(%s): %s", cli.StateDir, err)
+			return err
+		}
 	}
 
 	return nil

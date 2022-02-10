@@ -151,13 +151,13 @@ func (c *Client) Configuration(ctx context.Context, lastUpdate *time.Time) (*Con
 		return nil, err
 	}
 
+	// this means we don't have a config and the server didn't serve one
 	if lastUpdate != nil && payload == nil {
 		return nil, nil
 	}
 
 	one, ok := payload.(*jsonapi.OnePayload)
 	if !ok || one.Data == nil {
-		fmt.Println("bla")
 		return nil, FormatError
 	}
 	buf, err := json.Marshal(one.Data.Attributes)
