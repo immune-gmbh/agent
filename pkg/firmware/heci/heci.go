@@ -3,6 +3,7 @@ package heci
 import (
 	"errors"
 	"strconv"
+	"syscall"
 
 	"github.com/immune-gmbh/agent/v2/pkg/api"
 	"github.com/immune-gmbh/agent/v2/pkg/firmware/common"
@@ -83,9 +84,14 @@ func openMEClientInterface(cmd *api.MEClientCommands) (MECommandIntf, error) {
 	if cmd.GUID != nil {
 		m, err := openMEI("", *cmd.GUID)
 		if err != nil {
-			return nil, err
+			// skip return if MEI can't be opened (path nonexistent) and raw HECI addr is specified
+			var e syscall.Errno
+			if !errors.As(err, &e) || !(e == syscall.ENOENT) || (len(cmd.Address) == 0) {
+				return nil, err
+			}
+		} else {
+			return m, nil
 		}
-		return m, nil
 	}
 
 	if len(cmd.Address) != 0 {
