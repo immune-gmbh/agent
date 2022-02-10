@@ -2,6 +2,7 @@ package heci
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/immune-gmbh/agent/v2/pkg/api"
 	"github.com/immune-gmbh/agent/v2/pkg/firmware/common"
@@ -87,8 +88,13 @@ func openMEClientInterface(cmd *api.MEClientCommands) (MECommandIntf, error) {
 		return m, nil
 	}
 
-	if cmd.Address != nil {
-		m, err := openHECI1(*cmd.Address)
+	if len(cmd.Address) != 0 {
+		addr, err := strconv.ParseInt(cmd.Address, 10, 8)
+		if err != nil {
+			return nil, err
+		}
+
+		m, err := openHECI1(uint8(addr))
 		if err != nil {
 			return nil, err
 		}

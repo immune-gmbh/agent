@@ -81,7 +81,7 @@ type SEVCommand struct {
 
 type MEClientCommands struct {
 	GUID     *uuid.UUID    `json:"guid,omitempty"`
-	Address  *uint8        `json:"address,omitempty"`
+	Address  string        `json:"address,omitempty"`
 	Commands []MECommand   `json:"commands"`
 	Error    FirmwareError `json:"error,omitempty"` // FirmwareErr*
 }
