@@ -51,6 +51,7 @@ type StateV3 struct {
 func (s *StateV3) EnsureFresh(cl *api.Client) (bool, error) {
 	ctx := context.Background()
 	now := time.Now()
+
 	cfg, err := cl.Configuration(ctx, &s.LastUpdate)
 	if err != nil {
 		return false, err
@@ -59,9 +60,10 @@ func (s *StateV3) EnsureFresh(cl *api.Client) (bool, error) {
 	// if cfg is nil then there is no new config and we should use a cached version
 	if cfg != nil {
 		s.Config = *cfg
+		update := s.LastUpdate != time.Time{}
 		s.LastUpdate = now
 
-		return true, nil
+		return update, nil
 	}
 
 	return false, nil
