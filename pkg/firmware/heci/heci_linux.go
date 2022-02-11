@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-const heci1PciConfigPath = "/sys/bus/pci/devices/0000:00:15.0/config"
+const heci1PciConfigPath = "/sys/bus/pci/devices/0000:00:16.0/config"
 
 func readReg8(f *os.File, offset int64) (reg uint8, err error) {
 	_, err = f.Seek(offset, 0)
