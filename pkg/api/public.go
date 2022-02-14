@@ -63,7 +63,27 @@ type FirmwareProperties struct {
 	TPM2EventLog    ErrorBuffer        `json:"event_log"`
 	MACAddresses    MACAddresses       `json:"mac"`
 	OS              OS                 `json:"os"`
+	NICs            *NICList           `json:"nic,omitempty"`
 	Memory          Memory             `json:"memory"`
+	Agent           *Agent             `json:"agent,omitempty"`
+}
+
+type Agent struct {
+	Release   string `json:"release"`
+	ImageSHA2 string `json:"name,omitempty"`
+}
+
+type NICList struct {
+	List  []NIC         `json:"list,omitempty"`
+	Error FirmwareError `json:"error,omitempty"` // FirmwareErr*
+}
+
+type NIC struct {
+	Name  string        `json:"name,omitempty"`
+	IPv4  []string      `json:"ipv4,omitempty"`
+	IPv6  []string      `json:"ipv6,omitempty"`
+	MAC   string        `json:"mac"`
+	Error FirmwareError `json:"error,omitempty"` // FirmwareErr*
 }
 
 type OS struct {
@@ -320,11 +340,12 @@ type UEFI struct {
 }
 
 type TPM struct {
-	Manufacturer string            `json:"manufacturer"`
-	VendorID     string            `json:"vendor_id"`
-	SpecVersion  string            `json:"spec_version"`
-	EventLog     []TPMEvent        `json:"eventlog"`
-	PCR          map[string]string `json:"pcr"`
+	Manufacturer string                       `json:"manufacturer"`
+	VendorID     string                       `json:"vendor_id"`
+	SpecVersion  string                       `json:"spec_version"`
+	EventLog     []TPMEvent                   `json:"eventlog"`
+	PCR          map[string]string            `json:"pcr"`
+	PCRextended  map[string]map[string]string `json:"pcrext,omitempty"`
 }
 
 const (
