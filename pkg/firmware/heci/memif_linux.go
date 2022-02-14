@@ -11,7 +11,7 @@ import (
 const defaultDevMemPath = "/dev/mem"
 
 func openHECI1(clientAddress uint8) (*heci, error) {
-	f, err := os.Open(heci1PciConfigPath)
+	f, err := os.OpenFile(heci1PciConfigPath, os.O_RDWR, 0)
 	if err != nil {
 		return nil, fmt.Errorf("can't open HECI PCI config space: %w", err)
 	}
@@ -38,10 +38,10 @@ func openHECI1(clientAddress uint8) (*heci, error) {
 	if err != nil {
 		return nil, err
 	}
-	memSpaceEnable := (reg8>>1)&1 != 0
-	if !memSpaceEnable {
+	memSpaceEnabled := (reg8>>1)&1 != 0
+	if !memSpaceEnabled {
 		reg8 |= (1 << 1)
-		writeReg8(f, heci1Options, reg8)
+		err = writeReg8(f, heci1Options, reg8)
 		if err != nil {
 			return nil, err
 		}
@@ -57,6 +57,7 @@ func openHECI1(clientAddress uint8) (*heci, error) {
 	if err != nil {
 		return &m, err
 	}
+
 	return &m, nil
 }
 
