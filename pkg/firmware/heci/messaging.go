@@ -17,6 +17,7 @@ func (m *heci) recvMsg() ([]byte, error) {
 		if err := m.readCtrl(meiCtrlOffset); err != nil {
 			return nil, err
 		}
+
 		// reset and return only return when reset had errors
 		if !m.mei.IsReady() {
 			err := m.reset()
@@ -27,10 +28,10 @@ func (m *heci) recvMsg() ([]byte, error) {
 				return nil, err
 			}
 		}
+
 		filledSlots := uint8(m.mei.Writer - m.mei.Reader)
 		if filledSlots > m.mei.BufferSize {
-			err := m.reset()
-			if err != nil {
+			if err := m.reset(); err != nil {
 				return nil, err
 			}
 			return nil, fmt.Errorf("HECI communication error in RecvMsg")
@@ -101,8 +102,8 @@ func (m *heci) recvMsg() ([]byte, error) {
 	}
 
 	// notify ME message was read
-	m.host.SetClear()
-	m.host.SetInterrupt()
+	m.host.SetIRQStatus()
+	m.host.SetIRQTrigger()
 	if err := m.writeCtrl(hostCtrlOffset); err != nil {
 		return nil, err
 	}
@@ -119,11 +120,11 @@ restart:
 		return err
 	}
 	if !m.host.IsReady() || !m.mei.IsReady() {
-		err := m.reset()
-		if err != nil {
+		if err := m.reset(); err != nil {
 			return fmt.Errorf("mei or host side not ready: %w", err)
 		}
 	}
+
 	for {
 		if retries < 0 {
 			return fmt.Errorf("HECI SendMsg timeout")
@@ -135,19 +136,18 @@ restart:
 		filledSlots := uint8(m.host.Writer - m.host.Reader)
 		emptySlots := uint8(m.host.BufferSize - filledSlots)
 		if filledSlots > m.host.BufferSize {
-			err := m.reset()
-			if err != nil {
+			if err := m.reset(); err != nil {
 				return err
 			}
 			continue
 		} else if ((len(data) + 3) / 4) > int(emptySlots) {
 			time.Sleep(time.Millisecond * heciTimeoutMs)
-			// it is required to check readyness again when there are not enough slots
 			goto restart
 		} else {
 			break
 		}
 	}
+
 	rounds := uint8((len(data) + 3) / 4)
 	var i uint8
 	for i = 0; i < rounds; i++ {
@@ -158,7 +158,7 @@ restart:
 			return err
 		}
 	}
-	m.host.SetInterrupt()
+	m.host.SetIRQTrigger()
 	if err := m.writeCtrl(hostCtrlOffset); err != nil {
 		return err
 	}
@@ -171,9 +171,9 @@ restart:
 	return nil
 }
 
-func (u *heci) runCommand(command []byte) ([]byte, error) {
-	if err := u.sendMsg(command); err != nil {
+func (m *heci) runCommand(command []byte) ([]byte, error) {
+	if err := m.sendMsg(command); err != nil {
 		return nil, err
 	}
-	return u.recvMsg()
+	return m.recvMsg()
 }

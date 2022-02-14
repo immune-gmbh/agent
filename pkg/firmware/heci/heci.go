@@ -104,6 +104,13 @@ func openMEClientInterface(cmd *api.MEClientCommands) (MECommandIntf, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// HECI requires init
+		err = m.init()
+		if err != nil {
+			return nil, err
+		}
+
 		return m, nil
 	}
 
