@@ -127,6 +127,48 @@ func (a *TCGAnchor) PCRValues(bank tpm2.Algorithm, pcrsel []int) (map[string]api
 	return pcrs, nil
 }
 
+func (a *TCGAnchor) AllPCRValues() (map[string]map[string]api.Buffer, error) {
+	logrus.Traceln("read all PCRs")
+
+	availablePCRs, err := CapabilityPCRs(a.Conn)
+	if err != nil {
+		return nil, err
+	}
+
+	allPCRs := make(map[string]map[string]api.Buffer)
+	for _, pcrSel := range availablePCRs {
+		hash := strconv.Itoa(int(pcrSel.Hash))
+		allPCRs[hash] = make(map[string]api.Buffer)
+		if (pcrSel.PCRs == nil) || (len(pcrSel.PCRs) == 0) {
+			continue
+		}
+
+		for start := 0; start < len(pcrSel.PCRs); start += 8 {
+			end := start + 8
+			if end > len(pcrSel.PCRs) {
+				end = len(pcrSel.PCRs)
+			}
+
+			tmpPcrSel := tpm2.PCRSelection{
+				Hash: pcrSel.Hash,
+				PCRs: pcrSel.PCRs[start:end],
+			}
+
+			pcrVals, err := tpm2.ReadPCRs(a.Conn, tmpPcrSel)
+			if err != nil {
+				return nil, fmt.Errorf("unable to read PCRs from TPM: %v", err)
+			}
+			for pcrIndex, pcrVal := range pcrVals {
+				if pcrVal != nil {
+					allPCRs[hash][strconv.Itoa(pcrIndex)] = api.Buffer(pcrVal)
+				}
+			}
+		}
+	}
+
+	return allPCRs, nil
+}
+
 func CapabilityAlgorithms(conn io.ReadWriteCloser) (algs []tpm2.AlgorithmDescription, err error) {
 	var tmp []interface{}
 	more := true
@@ -157,7 +199,7 @@ func CapabilityPCRs(conn io.ReadWriteCloser) (pcrs []tpm2.PCRSelection, err erro
 		var newTmp []interface{}
 		newTmp, more, err = tpm2.GetCapability(conn, tpm2.CapabilityPCRs, maxTpmProperties, fa)
 		if err != nil {
-			return nil, fmt.Errorf("tpm get capability (algorithms) failed: %w", err)
+			return nil, fmt.Errorf("tpm get capability (PCRs) failed: %w", err)
 		}
 		fa = uint32(newTmp[len(newTmp)-1].(tpm2.PCRSelection).Hash)
 		tmp = append(tmp, newTmp...)

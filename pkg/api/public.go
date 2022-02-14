@@ -203,13 +203,14 @@ const EvidenceType = "evidence/1"
 
 // /v2/attest (apisrv)
 type Evidence struct {
-	Type      string             `jsonapi:"attr,type" json:"type"`
-	Quote     *Attest            `jsonapi:"attr,quote,omitempty" json:"quote,omitempty"`
-	Signature *Signature         `jsonapi:"attr,signature,omitempty" json:"signature,omitempty"`
-	Algorithm string             `jsonapi:"attr,algorithm" json:"algorithm"`
-	PCRs      map[string]Buffer  `jsonapi:"attr,pcrs" json:"pcrs"`
-	Firmware  FirmwareProperties `jsonapi:"attr,firmware" json:"firmware"`
-	Cookie    string             `jsonapi:"attr,cookie" json:"cookie"`
+	Type      string                       `jsonapi:"attr,type" json:"type"`
+	Quote     *Attest                      `jsonapi:"attr,quote,omitempty" json:"quote,omitempty"`
+	Signature *Signature                   `jsonapi:"attr,signature,omitempty" json:"signature,omitempty"`
+	Algorithm string                       `jsonapi:"attr,algorithm" json:"algorithm"`
+	PCRs      map[string]Buffer            `jsonapi:"attr,pcrs" json:"pcrs"`
+	AllPCRs   map[string]map[string]string `json:"allpcrs,omitempty"`
+	Firmware  FirmwareProperties           `jsonapi:"attr,firmware" json:"firmware"`
+	Cookie    string                       `jsonapi:"attr,cookie" json:"cookie"`
 }
 
 // /v2/enroll (apisrv)
@@ -340,12 +341,11 @@ type UEFI struct {
 }
 
 type TPM struct {
-	Manufacturer string                       `json:"manufacturer"`
-	VendorID     string                       `json:"vendor_id"`
-	SpecVersion  string                       `json:"spec_version"`
-	EventLog     []TPMEvent                   `json:"eventlog"`
-	PCR          map[string]string            `json:"pcr"`
-	PCRextended  map[string]map[string]string `json:"pcrext,omitempty"`
+	Manufacturer string            `json:"manufacturer"`
+	VendorID     string            `json:"vendor_id"`
+	SpecVersion  string            `json:"spec_version"`
+	EventLog     []TPMEvent        `json:"eventlog"`
+	PCR          map[string]string `json:"pcr"`
 }
 
 const (
