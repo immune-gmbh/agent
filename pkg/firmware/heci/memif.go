@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"syscall"
 	"time"
 	"unsafe"
 )
@@ -17,6 +18,7 @@ const (
 	maxMappedMem            = 8192
 	heciTimeoutMs           = 500
 	heciRetries             = 3
+	heciInitTimeout         = 20
 )
 
 type Ctrl struct {
@@ -33,15 +35,23 @@ type heci struct {
 	host Ctrl
 }
 
-func (c *Ctrl) SetClear() {
+func (c *Ctrl) SetIRQEnable() {
+	c.Status |= (1 << 0)
+}
+
+func (c *Ctrl) ClrIRQEnable() {
+	c.Status &^= (1 << 0)
+}
+
+func (c *Ctrl) SetIRQStatus() {
 	c.Status |= (1 << 1)
 }
 
-func (c *Ctrl) IsClear() bool {
+func (c *Ctrl) IsIRQStatus() bool {
 	return (c.Status>>1)&1 != 0
 }
 
-func (c *Ctrl) UnsetReset() {
+func (c *Ctrl) ClrReset() {
 	c.Status &^= (1 << 4)
 }
 
@@ -53,11 +63,11 @@ func (c *Ctrl) IsReset() bool {
 	return (c.Status>>4)&1 != 0
 }
 
-func (c *Ctrl) SetInterrupt() {
+func (c *Ctrl) SetIRQTrigger() {
 	c.Status |= (1 << 2)
 }
 
-func (c *Ctrl) IsInterrupt() bool {
+func (c *Ctrl) IsIRQTrigger() bool {
 	return (c.Status>>2)&1 != 0
 }
 
@@ -134,32 +144,69 @@ func (m *heci) readAt(offset uint32) (val uint32, err error) {
 	return
 }
 
+func (m *heci) waitMEReady(timeout100ms int) error {
+	for i := 0; i < timeout100ms; i++ {
+		if err := m.readCtrl(meiCtrlOffset); err != nil {
+			return err
+		}
+		time.Sleep(time.Millisecond * 100)
+		if m.mei.IsReady() {
+			return nil
+		}
+	}
+
+	return syscall.ETIMEDOUT
+}
+
+func (m *heci) init() error {
+	m.host.ClrIRQEnable()
+	m.host.SetReady()
+	m.host.SetIRQTrigger()
+
+	if err := m.readCtrl(meiCtrlOffset); err != nil {
+		return err
+	}
+	if m.mei.IsReset() {
+		m.host.SetReset()
+		if err := m.writeCtrl(hostCtrlOffset); err != nil {
+			return err
+		}
+	}
+
+	if err := m.waitMEReady(heciInitTimeout); err != nil {
+		return err
+	}
+
+	m.host.ClrReset()
+	if err := m.writeCtrl(hostCtrlOffset); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (m *heci) reset() error {
 	m.host.SetReset()
-	m.host.SetInterrupt()
+	m.host.SetIRQTrigger()
 	if err := m.writeCtrl(hostCtrlOffset); err != nil {
 		return err
 	}
 	if err := m.readCtrl(hostCtrlOffset); err != nil {
 		return err
 	}
-	for i := 0; i < 20; i++ {
-		if err := m.readCtrl(meiCtrlOffset); err != nil {
-			return err
-		}
-		time.Sleep(time.Millisecond * 100)
-		if m.mei.IsReady() {
-			m.host.SetReady()
-			m.host.SetInterrupt()
-			m.host.UnsetReset()
-			if err := m.writeCtrl(hostCtrlOffset); err != nil {
-				return err
-			}
-			if err := m.readCtrl(hostCtrlOffset); err != nil {
-				return err
-			}
-			return nil
-		}
+
+	if err := m.waitMEReady(heciInitTimeout); err != nil {
+		return err
 	}
-	return fmt.Errorf("reset didn't work")
+
+	m.host.SetReady()
+	m.host.SetIRQTrigger()
+	m.host.ClrReset()
+	if err := m.writeCtrl(hostCtrlOffset); err != nil {
+		return err
+	}
+	if err := m.readCtrl(hostCtrlOffset); err != nil {
+		return err
+	}
+	return nil
 }
