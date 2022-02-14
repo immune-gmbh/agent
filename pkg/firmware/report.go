@@ -1,8 +1,11 @@
 package firmware
 
 import (
+	"crypto/sha256"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/immune-gmbh/agent/v2/pkg/api"
 	"github.com/immune-gmbh/agent/v2/pkg/firmware/acpi"
@@ -109,6 +112,10 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	// Operating System information
 	osinfo.ReportOSInfo(&fwData.OS)
 
+	// Agent information
+	fwData.Agent = &api.Agent{}
+	ReportAgentHash(fwData.Agent)
+
 	// Intel VT-d registers
 	fwData.VTdRegisterSet.Error = api.NotImplemented
 
@@ -146,5 +153,41 @@ func ReportTPM2Properties(properties []api.TPM2Property, tpmConn io.ReadWriteClo
 		}
 		err = errors.New("tpm connection is nil")
 	}
+	return
+}
+
+func ReportAgentHash(agentInfo *api.Agent) (err error) {
+	logrus.Traceln("ReportAgentHash()")
+	defer func() {
+		if err != nil {
+			agentInfo.ImageSHA2.Error = common.ServeApiError(common.MapFSErrors(err))
+			logrus.Debugf("firmware.ReportAgentHash(): %s", err.Error())
+			logrus.Warnln("Failed to compute executable image hash")
+		}
+	}()
+
+	ex, err := os.Executable()
+	if err != nil {
+		return
+	}
+
+	ex, err = filepath.EvalSymlinks(ex)
+	if err != nil {
+		return
+	}
+
+	f, err := os.Open(ex)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err = io.Copy(h, f); err != nil {
+		return
+	}
+
+	agentInfo.ImageSHA2.Data = h.Sum(nil)
+
 	return
 }

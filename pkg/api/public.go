@@ -69,8 +69,8 @@ type FirmwareProperties struct {
 }
 
 type Agent struct {
-	Release   string `json:"release"`
-	ImageSHA2 string `json:"name,omitempty"`
+	Release   string      `json:"release"`
+	ImageSHA2 ErrorBuffer `json:"name,omitempty"`
 }
 
 type NICList struct {
