@@ -405,7 +405,7 @@ func run() int {
 			logrus.Fatalf("CA certificate ill-formed: %s", err.Error())
 		}
 	}
-	glob.Client = api.NewClient(cli.Server, caCert)
+	glob.Client = api.NewClient(cli.Server, caCert, releaseId)
 
 	// Run the selected subcommand
 	if err := ctx.Run(&glob); err != nil {

@@ -49,9 +49,10 @@ type Client struct {
 	Auth               string
 	HTTPRequestTimeout time.Duration // Timeout for all HTTP requests except POST
 	PostRequestTimeout time.Duration // POST requests may contain lots of data and need a different timeout
+	AgentVersion       string
 }
 
-func NewClient(base *url.URL, ca *x509.Certificate) Client {
+func NewClient(base *url.URL, ca *x509.Certificate, agentVersion string) Client {
 	var tlsConfig *tls.Config
 
 	if ca != nil {
@@ -67,6 +68,7 @@ func NewClient(base *url.URL, ca *x509.Certificate) Client {
 		Base:               base,
 		HTTPRequestTimeout: time.Second * DefaultHTTPRequestTimeoutSec,
 		PostRequestTimeout: time.Second * DefaultPostRequestTimeoutSec,
+		AgentVersion:       agentVersion,
 	}
 }
 
@@ -230,6 +232,7 @@ func (c *Client) doPost(ctx context.Context, route string, doc interface{}) (jso
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Content-Encoding", "gzip")
+	req.Header.Add("X-immune-agent-ver", c.AgentVersion)
 
 	return c.doRequest(req)
 }
