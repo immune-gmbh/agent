@@ -206,6 +206,7 @@ func (report *reportCmd) Run(glob *globalOptions) error {
 		logrus.Warnf("Failed to gather firmware state")
 		fwProps = api.FirmwareProperties{}
 	}
+	fwProps.Agent.Release = releaseId
 
 	// read PCRs
 	pcrValues, err := glob.Anchor.PCRValues(tpm2.Algorithm(glob.State.Config.PCRBank), glob.State.Config.PCRs)
