@@ -45,7 +45,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	}
 	fwPropsHash := sha256.Sum256(fwPropsJCS)
 
-	// read PCRs
+	// read selected PCRs
 	pcrValues, err := anchor.PCRValues(tpm2.Algorithm(st.Config.PCRBank), st.Config.PCRs)
 	if err != nil {
 		log.Debugf("tcg.PCRValues(glob.TpmConn, pcrSel): %s", err.Error())
@@ -57,6 +57,14 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 		if i, err := strconv.ParseInt(k, 10, 32); err == nil {
 			quotedPCR = append(quotedPCR, int(i))
 		}
+	}
+
+	// read all PCRs
+	allPCRs, err := anchor.AllPCRValues()
+	if err != nil {
+		log.Debugf("tcg.AllPCRValues(): %s", err.Error())
+		log.Error("Failed read all PCR values")
+		return nil, err
 	}
 
 	// load Root key
@@ -114,6 +122,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 		Signature: &sig,
 		Algorithm: strconv.Itoa(int(st.Config.PCRBank)),
 		PCRs:      pcrValues,
+		AllPCRs:   allPCRs,
 		Firmware:  fwProps,
 		Cookie:    cookie,
 	}
