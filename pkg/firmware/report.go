@@ -116,6 +116,10 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	fwData.Agent = &api.Agent{}
 	ReportAgentHash(fwData.Agent)
 
+	// Network Interface Cards
+	fwData.NICs = &api.NICList{}
+	netif.ReportNICs(fwData.NICs)
+
 	// Intel VT-d registers
 	fwData.VTdRegisterSet.Error = api.NotImplemented
 
