@@ -277,6 +277,7 @@ type ReportValues struct {
 	SGX    *SGX    `json:"sgx,omitempty"`
 	TXT    *TXT    `json:"txt,omitempty"`
 	SEV    *SEV    `json:"sev,omitempty"`
+	NICs   []NIC   `json:"nics,omitempty"`
 }
 
 const (
