@@ -310,6 +310,8 @@ type Host struct {
 type SMBIOS struct {
 	Manufacturer    string `json:"manufacturer"`
 	Product         string `json:"product"`
+	Serial          string `json:"serial,omitempty"`
+	UUID            string `json:"uuid,omitempty"`
 	BIOSReleaseDate string `json:"bios_release_date"`
 	BIOSVendor      string `json:"bios_vendor"`
 	BIOSVersion     string `json:"bios_version"`
