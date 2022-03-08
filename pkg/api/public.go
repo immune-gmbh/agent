@@ -237,11 +237,16 @@ const VerdictType = "verdict/1"
 
 // /v2/devices (apisrv)
 type Verdict struct {
-	Type          string `json:"type"`
-	Result        bool   `json:"result"`
-	Bootchain     bool   `json:"bootchain"`
-	Firmware      bool   `json:"firmware"`
-	Configuration bool   `json:"configuration"`
+	Type               string `json:"type"`
+	Result             bool   `json:"result"`
+	SupplyChain        bool   `json:"supply_chain"`
+	Configuration      bool   `json:"configuration"`
+	Firmware           bool   `json:"firmware"`
+	Bootloader         bool   `json:"bootloader"`
+	OperatingSystem    bool   `json:"operating_system"`
+	EndpointProtection bool   `json:"endpoint_protection"`
+
+	Bootchain bool `json:"bootchain"` // deprecated
 }
 
 const ReportType = "report/2"
