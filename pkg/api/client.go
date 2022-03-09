@@ -232,7 +232,6 @@ func (c *Client) doPost(ctx context.Context, route string, doc interface{}) (jso
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Content-Encoding", "gzip")
-	req.Header.Add("X-immune-agent-ver", c.AgentVersion)
 
 	return c.doRequest(req)
 }
@@ -258,6 +257,11 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 	if c.Auth != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.Auth))
 	}
+
+	// this should tell all relaying servers to send error pages as json
+	// API server uses json by default anyway
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("X-immune-agent-ver", c.AgentVersion)
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
