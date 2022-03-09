@@ -220,7 +220,7 @@ func (a *TCGAnchor) ActivateDeviceKey(cred api.EncryptedCredential, endorsementA
 		Auth:       []byte(endorsementAuth),
 	}
 
-	_, err = tpm2.PolicySecret(a.Conn, tpm2.HandleEndorsement, authCmd, ekSession, nil, nil, nil, 0)
+	_, _, err = tpm2.PolicySecret(a.Conn, tpm2.HandleEndorsement, authCmd, ekSession, nil, nil, nil, 0)
 	if err != nil {
 		return "", fmt.Errorf("tpm2.PolicySecret() failed: %v", err)
 	}
