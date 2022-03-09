@@ -7,7 +7,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/immune-gmbh/agent/v2/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/api"
 )
 
 type FirmwareError struct {

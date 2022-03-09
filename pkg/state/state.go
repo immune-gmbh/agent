@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/immune-gmbh/agent/v2/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/api"
 )
 
 const (

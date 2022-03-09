@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-tpm-tools/client"
 	"github.com/google/go-tpm/tpm2"
 
-	test "github.com/immune-gmbh/agent/v2/internal/testing"
+	test "github.com/immune-gmbh/agent/v3/internal/testing"
 )
 
 func TestEncodeEmptyBuffer(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/immune-gmbh/agent/v2/pkg/util"
+	"github.com/immune-gmbh/agent/v3/pkg/util"
 	"golang.org/x/sys/windows"
 )
 

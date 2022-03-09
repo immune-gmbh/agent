@@ -1,8 +1,8 @@
 package cpuid
 
 import (
-	"github.com/immune-gmbh/agent/v2/pkg/api"
-	"github.com/immune-gmbh/agent/v2/pkg/util"
+	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/util"
 	"github.com/sirupsen/logrus"
 )
 

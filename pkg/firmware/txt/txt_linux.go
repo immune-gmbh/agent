@@ -6,7 +6,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/immune-gmbh/agent/v2/pkg/firmware/common"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 )
 
 const (

@@ -1,8 +1,8 @@
 package biosflash
 
 import (
-	"github.com/immune-gmbh/agent/v2/pkg/api"
-	"github.com/immune-gmbh/agent/v2/pkg/firmware/common"
+	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 	"github.com/klauspost/compress/zstd"
 	"github.com/sirupsen/logrus"
 )

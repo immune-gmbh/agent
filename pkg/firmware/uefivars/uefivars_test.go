@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/immune-gmbh/agent/v2/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/api"
 )
 
 type scenario struct {

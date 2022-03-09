@@ -5,7 +5,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/immune-gmbh/agent/v2/pkg/util"
+	"github.com/immune-gmbh/agent/v3/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 
