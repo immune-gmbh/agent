@@ -26,7 +26,7 @@ type TrustAnchor interface {
 
 	PCRValues(tpm2.Algorithm, []int) (map[string]api.Buffer, error)
 	AllPCRValues() (map[string]map[string]api.Buffer, error)
-	Quote(aikHandle Handle, aikAuth string, additional api.Buffer, bank tpm2.Algorithm, pcrs []int) (api.Attest, api.Signature, error)
+	Quote(aikHandle Handle, aikAuth string, additional api.Buffer, banks []tpm2.Algorithm, pcrs []int) (api.Attest, api.Signature, error)
 
 	FlushAllHandles()
 	Close()

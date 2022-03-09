@@ -55,13 +55,18 @@ func (a *TCGAnchor) Close() {
 	a.Conn.Close()
 }
 
-func (a *TCGAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffer, bank tpm2.Algorithm, pcrs []int) (api.Attest, api.Signature, error) {
+func (a *TCGAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffer, banks []tpm2.Algorithm, pcrs []int) (api.Attest, api.Signature, error) {
 	logrus.Traceln("tpm quote")
 
 	aikH := aikHandle.(*TCGHandle).Handle
-	pcrSel := tpm2.PCRSelection{
-		Hash: bank,
-		PCRs: pcrs,
+
+	// select the same PCRs in multiple banks
+	pcrSel := []tpm2.PCRSelection{}
+	for _, bank := range banks {
+		pcrSel = append(pcrSel, tpm2.PCRSelection{
+			Hash: bank,
+			PCRs: pcrs,
+		})
 	}
 
 	// generate quote
