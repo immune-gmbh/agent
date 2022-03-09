@@ -311,6 +311,23 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 
 		logrus.Debugf("HTTP body: %s", string(respBytes))
 
+		if ctype, ok := resp.Header["Content-Type"]; ok {
+			ok = false
+			for _, val := range ctype {
+				ok = (val == "application/vnd.api+json") || (val == "application/json")
+				if ok {
+					break
+				}
+			}
+			if !ok {
+				if retErr == nil {
+					retErr = FormatError
+				}
+				logrus.Debugf("Wrong HTTP content type: %v", ctype)
+				return nil, retErr
+			}
+		}
+
 		var one jsonapi.OnePayload
 		if err = json.Unmarshal(respBytes, &one); err != nil {
 			var many jsonapi.ManyPayload
