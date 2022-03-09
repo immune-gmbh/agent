@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/gowebpki/jcs"
-	test "github.com/immune-gmbh/agent/v2/internal/testing"
-	"github.com/immune-gmbh/agent/v2/pkg/api"
-	"github.com/immune-gmbh/agent/v2/pkg/tcg"
+	test "github.com/immune-gmbh/agent/v3/internal/testing"
+	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 )
 
 var originalArg0 string = os.Args[0]

@@ -13,10 +13,10 @@ import (
 	"github.com/gowebpki/jcs"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/immune-gmbh/agent/v2/pkg/api"
-	"github.com/immune-gmbh/agent/v2/pkg/firmware"
-	"github.com/immune-gmbh/agent/v2/pkg/state"
-	"github.com/immune-gmbh/agent/v2/pkg/tcg"
+	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware"
+	"github.com/immune-gmbh/agent/v3/pkg/state"
+	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 )
 
 func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State) (*api.Appraisal, error) {

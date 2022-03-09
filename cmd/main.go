@@ -20,12 +20,12 @@ import (
 
 	tpm1 "github.com/google/go-tpm/tpm"
 	"github.com/google/go-tpm/tpm2"
-	"github.com/immune-gmbh/agent/v2/pkg/api"
-	"github.com/immune-gmbh/agent/v2/pkg/attestation"
-	"github.com/immune-gmbh/agent/v2/pkg/firmware"
-	"github.com/immune-gmbh/agent/v2/pkg/state"
-	"github.com/immune-gmbh/agent/v2/pkg/tcg"
-	"github.com/immune-gmbh/agent/v2/pkg/util"
+	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/attestation"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware"
+	"github.com/immune-gmbh/agent/v3/pkg/state"
+	"github.com/immune-gmbh/agent/v3/pkg/tcg"
+	"github.com/immune-gmbh/agent/v3/pkg/util"
 )
 
 const (

@@ -9,7 +9,7 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpmutil"
 
-	"github.com/immune-gmbh/agent/v2/internal/testing"
+	"github.com/immune-gmbh/agent/v3/internal/testing"
 )
 
 func GenerateSignatureECC(rand *rand.Rand) tpm2.SignatureECC {

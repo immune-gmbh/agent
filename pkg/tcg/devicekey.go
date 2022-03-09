@@ -14,8 +14,8 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/immune-gmbh/agent/v2/pkg/api"
-	"github.com/immune-gmbh/agent/v2/pkg/state"
+	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/state"
 )
 
 var ErrInvalid = errors.New("invalid arg")

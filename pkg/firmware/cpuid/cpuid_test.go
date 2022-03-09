@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/immune-gmbh/agent/v2/pkg/util"
+	"github.com/immune-gmbh/agent/v3/pkg/util"
 )
 
 func TestReadCPUID(t *testing.T) {

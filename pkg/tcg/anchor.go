@@ -4,8 +4,8 @@ import (
 	"crypto/x509"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/immune-gmbh/agent/v2/pkg/api"
-	"github.com/immune-gmbh/agent/v2/pkg/state"
+	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/state"
 )
 
 type Handle interface {

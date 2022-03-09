@@ -9,9 +9,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/immune-gmbh/agent/v2/pkg/api"
-	"github.com/immune-gmbh/agent/v2/pkg/state"
-	"github.com/immune-gmbh/agent/v2/pkg/tcg"
+	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/state"
+	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 )
 
 func Enroll(ctx context.Context, client *api.Client, token string, endorsementAuth string, defaultNameHint string, anchor tcg.TrustAnchor, st *state.State) error {
