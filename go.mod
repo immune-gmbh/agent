@@ -4,6 +4,8 @@ go 1.16
 
 replace github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt v3.2.0+incompatible
 
+replace github.com/google/go-tpm => github.com/immune-gmbh/go-tpm v0.3.4-0.20220310140359-93b752e22d71
+
 require (
 	github.com/StackExchange/wmi v1.2.1
 	github.com/alecthomas/kong v0.2.18
