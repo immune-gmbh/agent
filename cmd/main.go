@@ -168,7 +168,7 @@ func (attest *attestCmd) Run(glob *globalOptions) error {
 
 func doAttest(glob *globalOptions, ctx context.Context) error {
 	logrus.Info("Doing attestation, this may take a while")
-	report, err := attestation.Attest(ctx, &glob.Client, glob.EndorsementAuth, glob.Anchor, glob.State)
+	report, err := attestation.Attest(ctx, &glob.Client, glob.EndorsementAuth, glob.Anchor, glob.State, false)
 	if err != nil {
 		return err
 	}
