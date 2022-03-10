@@ -7,10 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
+	"os"
 	"strconv"
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/gowebpki/jcs"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
@@ -19,7 +22,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 )
 
-func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State) (*api.Appraisal, error) {
+func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State, dumpEvidence bool) (*api.Appraisal, error) {
 	var conn io.ReadWriteCloser
 	if anch, ok := anchor.(*tcg.TCGAnchor); ok {
 		conn = anch.Conn
@@ -125,6 +128,24 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 		AllPCRs:   allPCRs,
 		Firmware:  fwProps,
 		Cookie:    cookie,
+	}
+
+	evidenceJSON, err := json.Marshal(evidence)
+	if err != nil {
+		logrus.Debugf("json.Marshal(Evidence): %s", err.Error())
+		logrus.Fatalf("Internal error while encoding firmware state. This is a bug, please report it to bugs@immu.ne.")
+	}
+
+	if dumpEvidence {
+		host, err := os.Hostname()
+		if err != nil {
+			return nil, err
+		}
+		path := host + ".evidence.json"
+		if err := ioutil.WriteFile(path, evidenceJSON, 0644); err != nil {
+			return nil, err
+		}
+		logrus.Infof("Dumped evidence json: %s", path)
 	}
 
 	// API call
