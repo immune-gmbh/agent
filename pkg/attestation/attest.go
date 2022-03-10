@@ -108,9 +108,21 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	defer aikHandle.Flush(anchor)
 	rootHandle.Flush(anchor)
 
+	// convert used PCR banks to tpm2.Algorithm selection for quote
+	var algs []tpm2.Algorithm
+	for k, _ := range allPCRs {
+		alg, err := strconv.ParseInt(k, 10, 16)
+		if err != nil {
+			log.Debugf("ParseInt failed: %s", err)
+			log.Error("Invalid PCR bank selector")
+			return nil, err
+		}
+		algs = append(algs, tpm2.Algorithm(alg))
+	}
+
 	// generate quote
 	log.Traceln("generate quote")
-	quote, sig, err := anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], tpm2.Algorithm(st.Config.PCRBank), quotedPCR)
+	quote, sig, err := anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, quotedPCR)
 	if err != nil || (sig.ECC == nil && sig.RSA == nil) {
 		log.Debugf("TPM2_Quote failed: %s", err)
 		log.Error("TPM 2.0 attestation failed")
