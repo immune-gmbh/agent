@@ -208,7 +208,7 @@ type Evidence struct {
 	Signature *Signature                   `jsonapi:"attr,signature,omitempty" json:"signature,omitempty"`
 	Algorithm string                       `jsonapi:"attr,algorithm" json:"algorithm"`
 	PCRs      map[string]Buffer            `jsonapi:"attr,pcrs" json:"pcrs"`
-	AllPCRs   map[string]map[string]Buffer `json:"allpcrs,omitempty"`
+	AllPCRs   map[string]map[string]Buffer `jsonapi:"attr,allpcrs" json:"allpcrs"`
 	Firmware  FirmwareProperties           `jsonapi:"attr,firmware" json:"firmware"`
 	Cookie    string                       `jsonapi:"attr,cookie" json:"cookie"`
 }
