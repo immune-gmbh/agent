@@ -7,5 +7,5 @@
 package tools
 
 import (
-	_ "github.com/immune-gmbh/go-licenses"
+	_ "github.com/google/go-licenses"
 )
