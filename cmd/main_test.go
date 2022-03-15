@@ -129,7 +129,7 @@ func TestGen(t *testing.T) {
 	}
 	fmt.Printf("pcr: %s\n", string(pcrBuf))
 
-	attest, sig, err := sim.Quote(aikHandle, keyAuth, fwPropsHash[:], tpm2.Algorithm(config.PCRBank), config.PCRs)
+	attest, sig, err := sim.Quote(aikHandle, keyAuth, fwPropsHash[:], []tpm2.Algorithm{tpm2.Algorithm(config.PCRBank)}, config.PCRs)
 	if err != nil {
 		t.Fatal(err)
 	}
