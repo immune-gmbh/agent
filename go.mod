@@ -6,6 +6,8 @@ replace github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt v3.2.0+incompat
 
 replace github.com/google/go-tpm => github.com/immune-gmbh/go-tpm v0.3.4-0.20220310140359-93b752e22d71
 
+replace github.com/google/go-tpm-tools => github.com/immune-gmbh/go-tpm-tools v0.3.5-0.20220310173717-20c83b9942a4
+
 require (
 	github.com/StackExchange/wmi v1.2.1
 	github.com/alecthomas/kong v0.2.18
