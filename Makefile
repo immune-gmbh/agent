@@ -35,7 +35,7 @@ deps:
 	@$(GO) mod download
 	@$(GO) install github.com/tc-hib/go-winres@latest
 	@$(GO) install gotest.tools/gotestsum@latest
-	@$(GO) install github.com/immune-gmbh/go-licenses
+	@$(GO) install github.com/google/go-licenses
 
 # need to cd into the directory b/c the command doesn't accept output parameter
 cmd/rsrc_windows_amd64.syso: deps winres/winres.json winres/icon.png winres/icon16.png winres/icon32.png winres/icon48.png
