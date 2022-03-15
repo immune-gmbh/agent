@@ -142,20 +142,28 @@ func (s *SoftwareAnchor) Close() {
 	return
 }
 
-func (a *SoftwareAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffer, bank tpm2.Algorithm, pcrs []int) (api.Attest, api.Signature, error) {
+func (a *SoftwareAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffer, banks []tpm2.Algorithm, pcrs []int) (api.Attest, api.Signature, error) {
 	aikH := aikHandle.(*SoftwareHandle)
 	if aikH.ty != "dev" {
 		return api.Attest{}, api.Signature{}, errors.New("wrong aik")
 	}
 
-	pcrHash, err := bank.Hash()
+	pcrHash, err := tpm2.AlgSHA256.Hash()
 	if err != nil {
 		return api.Attest{}, api.Signature{}, err
 	}
 	pcrHasher := pcrHash.New()
 	digest := make([]byte, pcrHash.Size())
-	for range pcrs {
-		pcrHasher.Write(digest)
+
+	var pcrSels []tpm2.PCRSelection
+	for _, bank := range banks {
+		pcrSels = append(pcrSels, tpm2.PCRSelection{
+			Hash: bank,
+			PCRs: pcrs,
+		})
+		for range pcrs {
+			pcrHasher.Write(digest)
+		}
 	}
 
 	attest := tpm2.AttestationData{
@@ -166,11 +174,8 @@ func (a *SoftwareAnchor) Quote(aikHandle Handle, aikAuth string, additional api.
 		ClockInfo:       tpm2.ClockInfo{},
 		FirmwareVersion: 0,
 		AttestedQuoteInfo: &tpm2.QuoteInfo{
-			PCRSelection: tpm2.PCRSelection{
-				Hash: bank,
-				PCRs: pcrs,
-			},
-			PCRDigest: pcrHasher.Sum([]byte{}),
+			PCRSelection: pcrSels,
+			PCRDigest:    pcrHasher.Sum([]byte{}),
 		},
 	}
 
