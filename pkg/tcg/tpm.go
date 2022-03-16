@@ -142,11 +142,11 @@ func (a *TCGAnchor) AllPCRValues() (map[string]map[string]api.Buffer, error) {
 
 	allPCRs := make(map[string]map[string]api.Buffer)
 	for _, pcrSel := range availablePCRs {
-		hash := strconv.Itoa(int(pcrSel.Hash))
-		allPCRs[hash] = make(map[string]api.Buffer)
 		if (pcrSel.PCRs == nil) || (len(pcrSel.PCRs) == 0) {
 			continue
 		}
+		hash := strconv.Itoa(int(pcrSel.Hash))
+		allPCRs[hash] = make(map[string]api.Buffer)
 
 		for start := 0; start < len(pcrSel.PCRs); start += 8 {
 			end := start + 8
