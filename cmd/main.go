@@ -114,6 +114,7 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 	}
 
 	if err := attestation.Enroll(ctx, &glob.Client, enroll.Token, glob.EndorsementAuth, defaultNameHint, glob.Anchor, glob.State); err != nil {
+		tui.SetUIState(tui.StEnrollFailed)
 		return err
 	}
 
@@ -133,6 +134,7 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 		return err
 	}
 
+	tui.SetUIState(tui.StEnrollSuccess)
 	logrus.Infof("Device enrolled")
 	if enroll.NoAttest {
 		logrus.Infof("You can now attest with \"%s attest\"", os.Args[0])
@@ -175,9 +177,31 @@ func doAttest(glob *globalOptions, ctx context.Context) error {
 	logrus.Info("Doing attestation, this may take a while")
 	appraisal, err := attestation.Attest(ctx, &glob.Client, glob.EndorsementAuth, glob.Anchor, glob.State, false)
 	if err != nil {
+		tui.SetUIState(tui.StAttestationFailed)
 		return err
 	}
+	tui.SetUIState(tui.StAttestationSuccess)
 	logrus.Infof("Attestation successful")
+
+	if appraisal.Verdict.Result {
+		tui.SetUIState(tui.StDeviceTrusted)
+		tui.SetUIState(tui.StChainAllGood)
+	} else {
+		tui.SetUIState(tui.StDeviceVulnerable)
+		if !appraisal.Verdict.SupplyChain {
+			tui.SetUIState(tui.StChainFailSupplyChain)
+		} else if !appraisal.Verdict.Configuration {
+			tui.SetUIState(tui.StChainFailConfiguration)
+		} else if !appraisal.Verdict.Firmware {
+			tui.SetUIState(tui.StChainFailFirmware)
+		} else if !appraisal.Verdict.Bootloader {
+			tui.SetUIState(tui.StChainFailBootloader)
+		} else if !appraisal.Verdict.OperatingSystem {
+			tui.SetUIState(tui.StChainFailOperatingSystem)
+		} else if !appraisal.Verdict.EndpointProtection {
+			tui.SetUIState(tui.StChainFailEndpointProtection)
+		}
+	}
 
 	if appraisal, err := json.MarshalIndent(*appraisal, "", "  "); err == nil {
 		logrus.Debugln(string(appraisal))

@@ -20,6 +20,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/firmware"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
+	"github.com/immune-gmbh/agent/v3/pkg/tui"
 )
 
 func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State, dumpEvidence bool) (*api.Appraisal, error) {
@@ -29,6 +30,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	}
 
 	// collect firmware info
+	tui.SetUIState(tui.StCollectFirmwareInfo)
 	fwProps, err := firmware.GatherFirmwareData(conn, &st.Config)
 	if err != nil {
 		log.Warnf("Failed to gather firmware state")
@@ -71,6 +73,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	}
 
 	// load Root key
+	tui.SetUIState(tui.StQuotePCR)
 	rootHandle, rootPub, err := anchor.CreateAndLoadRoot(endorsementAuth, st.Root.Auth, &st.Config.Root.Public)
 	if err != nil {
 		log.Debugf("tcg.CreateAndLoadRoot(..): %s", err.Error())
@@ -161,6 +164,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	}
 
 	// API call
+	tui.SetUIState(tui.StSendEvidence)
 	attestResp, err := client.Attest(ctx, aik.Credential, evidence)
 	// HTTP-level errors
 	if errors.Is(err, api.AuthError) {

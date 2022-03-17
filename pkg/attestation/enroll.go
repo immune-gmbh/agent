@@ -12,9 +12,11 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
+	"github.com/immune-gmbh/agent/v3/pkg/tui"
 )
 
 func Enroll(ctx context.Context, client *api.Client, token string, endorsementAuth string, defaultNameHint string, anchor tcg.TrustAnchor, st *state.State) error {
+	tui.SetUIState(tui.StCreateKeys)
 	log.Info("Creating Endorsement key")
 	ekHandle, ekPub, err := anchor.GetEndorsementKey()
 	if err != nil {
@@ -102,6 +104,7 @@ func Enroll(ctx context.Context, client *api.Client, token string, endorsementAu
 		Keys:                   keyCerts,
 	}
 
+	tui.SetUIState(tui.StEnrollKeys)
 	enrollResp, err := client.Enroll(ctx, token, enrollReq)
 	// HTTP-level errors
 	if errors.Is(err, api.AuthError) {
