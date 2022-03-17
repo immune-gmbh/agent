@@ -52,7 +52,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	pcrValues, err := anchor.PCRValues(tpm2.Algorithm(st.Config.PCRBank), st.Config.PCRs)
 	if err != nil {
 		log.Debugf("tcg.PCRValues(glob.TpmConn, pcrSel): %s", err.Error())
-		log.Error("Failed read all PCR values")
+		log.Error("Failed to read selected PCR values")
 		return nil, err
 	}
 	quotedPCR := []int{}
@@ -66,7 +66,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	allPCRs, err := anchor.AllPCRValues()
 	if err != nil {
 		log.Debugf("tcg.AllPCRValues(): %s", err.Error())
-		log.Error("Failed read all PCR values")
+		log.Error("Failed to read all PCR values")
 		return nil, err
 	}
 
