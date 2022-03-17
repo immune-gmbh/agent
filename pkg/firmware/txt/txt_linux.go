@@ -1,10 +1,7 @@
 package txt
 
 import (
-	"bytes"
-	"io"
 	"os"
-	"syscall"
 
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 )
@@ -17,24 +14,24 @@ const (
 
 func readTXTPublicSpace() ([]byte, error) {
 	f, err := os.Open(txtPubSpaceFilePath)
-	var r io.Reader
 	if os.IsNotExist(err) {
-		fd, err := os.OpenFile(common.DefaultDevMemPath, os.O_RDWR, 0)
+		// we tried mmap() but that only returns 0xff
+		f, err = os.Open(common.DefaultDevMemPath)
 		if err != nil {
 			return nil, err
 		}
-		defer fd.Close()
-		mem, err := syscall.Mmap(int(fd.Fd()), int64(txtPublicRegionMmap), maxMappedMem, syscall.PROT_READ, syscall.MAP_SHARED)
+		_, err = f.Seek(txtPublicRegionMmap, os.SEEK_SET)
 		if err != nil {
+			f.Close()
 			return nil, err
 		}
-		defer syscall.Munmap(mem)
-		r = bytes.NewReader(mem)
-	} else if err != nil {
-		return nil, err
-	} else {
-		defer f.Close()
-		r = f
 	}
-	return io.ReadAll(r)
+	defer f.Close()
+
+	space := make([]byte, maxMappedMem)
+	_, err = f.Read(space)
+	if err != nil {
+		return nil, err
+	}
+	return space, nil
 }
