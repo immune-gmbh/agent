@@ -31,6 +31,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 
 	// collect firmware info
 	tui.SetUIState(tui.StCollectFirmwareInfo)
+	logrus.Info("Collecting firmware info")
 	fwProps, err := firmware.GatherFirmwareData(conn, &st.Config)
 	if err != nil {
 		log.Warnf("Failed to gather firmware state")
@@ -74,6 +75,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 
 	// load Root key
 	tui.SetUIState(tui.StQuotePCR)
+	logrus.Info("Signing attestation data")
 	rootHandle, rootPub, err := anchor.CreateAndLoadRoot(endorsementAuth, st.Root.Auth, &st.Config.Root.Public)
 	if err != nil {
 		log.Debugf("tcg.CreateAndLoadRoot(..): %s", err.Error())
@@ -165,6 +167,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 
 	// API call
 	tui.SetUIState(tui.StSendEvidence)
+	logrus.Info("Sending report to immune Guard cloud")
 	attestResp, err := client.Attest(ctx, aik.Credential, evidence)
 	// HTTP-level errors
 	if errors.Is(err, api.AuthError) {
