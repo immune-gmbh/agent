@@ -16,6 +16,8 @@ import (
 	"runtime"
 
 	"github.com/alecthomas/kong"
+	"github.com/mattn/go-colorable"
+	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
 
 	tpm1 "github.com/google/go-tpm/tpm"
@@ -25,6 +27,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/firmware"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
+	"github.com/immune-gmbh/agent/v3/pkg/tui"
 	"github.com/immune-gmbh/agent/v3/pkg/util"
 )
 
@@ -67,12 +70,14 @@ func (v traceFlag) BeforeApply() error {
 
 type rootCmd struct {
 	// Global options
-	Verbose  verboseFlag `help:"Enable verbose mode."`
-	Trace    traceFlag   `hidden`
 	Server   *url.URL    `name:"server" help:"immune SaaS API URL" default:"${server_default_url}" type:"*url.URL"`
 	CA       string      `name:"server-ca" help:"immune SaaS API CA (PEM encoded)" optional type:"path"`
 	StateDir string      `name:"state-dir" default:"${state_default_dir}" help:"Directory holding the cli state" type:"path"`
 	TPM      string      `name:"tpm" default:"${tpm_default_path}" help:"TPM device: device path (${tpm_default_path}) or mssim, sgx, swtpm/net url (mssim://localhost, sgx://localhost, net://localhost:1234)"`
+	LogFlag  bool        `name:"log" help:"Force log output on and text UI off"`
+	Verbose  verboseFlag `help:"Enable verbose mode. Implies --log"`
+	Trace    traceFlag   `hidden`
+	Colors   bool        `help:"Force colors on for all console outputs (default: autodetect)"`
 
 	// Subcommands
 	Report reportCmd `cmd:"" help:"Generates a platform report"`
@@ -168,14 +173,14 @@ func (attest *attestCmd) Run(glob *globalOptions) error {
 
 func doAttest(glob *globalOptions, ctx context.Context) error {
 	logrus.Info("Doing attestation, this may take a while")
-	report, err := attestation.Attest(ctx, &glob.Client, glob.EndorsementAuth, glob.Anchor, glob.State, false)
+	appraisal, err := attestation.Attest(ctx, &glob.Client, glob.EndorsementAuth, glob.Anchor, glob.State, false)
 	if err != nil {
 		return err
 	}
 	logrus.Infof("Attestation successful")
 
-	if report, err := json.MarshalIndent(*report, "", "  "); err == nil {
-		logrus.Debugln(string(report))
+	if appraisal, err := json.MarshalIndent(*appraisal, "", "  "); err == nil {
+		logrus.Debugln(string(appraisal))
 	}
 
 	return nil
@@ -373,6 +378,8 @@ func run() int {
 		},
 		kong.Bind(&glob))
 
+	initUI(cli.Colors, cli.LogFlag || bool(cli.Verbose) || bool(cli.Trace))
+
 	// tell who we are
 	logrus.Debug(desc)
 
@@ -413,5 +420,20 @@ func run() int {
 		return 1
 	} else {
 		return 0
+	}
+}
+
+func initUI(forceColors bool, forceLog bool) {
+	notty := os.Getenv("TERM") == "dumb" || (!isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()))
+	if forceColors || !notty {
+		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
+		logrus.SetOutput(colorable.NewColorableStdout())
+	} else {
+		logrus.SetOutput(os.Stdout)
+	}
+
+	if !forceLog && !notty {
+		logrus.SetLevel(logrus.ErrorLevel)
+		tui.Init()
 	}
 }
