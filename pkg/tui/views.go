@@ -8,6 +8,15 @@ import (
 	"github.com/fatih/color"
 )
 
+var chainTexts []string = []string{
+	"Supply Chain",
+	"Configuration",
+	"Firmware",
+	"Bootloader",
+	"Operating System",
+	"Endpoint Protection",
+}
+
 type Spinner struct {
 	Spinner  *spinner.Spinner
 	Current  string
@@ -21,6 +30,12 @@ var (
 	InfoStyle    = color.New(color.FgCyan, color.BgBlack, color.Bold).SprintFunc()
 	SuccessStyle = color.New(color.FgGreen, color.BgBlack, color.Bold).SprintFunc()
 	FailureStyle = color.New(color.FgRed, color.BgBlack, color.Bold).SprintFunc()
+)
+
+// platform dependent strings
+var (
+	CheckMark = "✔"
+	Cross     = "✘"
 )
 
 func haveSpinner() bool {
@@ -39,7 +54,7 @@ func showTrust(trusted bool) {
 	} else {
 		status = FailureStyle("VULNERABLE")
 	}
-	printf("\nThis device is %s.\n", status)
+	printf("\n >> This device is %s <<\n", status)
 }
 
 func completeLastStep(success bool) {
@@ -55,9 +70,9 @@ func showStepDone(message string, success bool) {
 
 	var status string
 	if success {
-		status = SuccessStyle("+")
+		status = SuccessStyle(CheckMark)
 	} else {
-		status = FailureStyle("+")
+		status = FailureStyle(Cross)
 	}
 	printf("[%s] %s\n", status, message)
 }
@@ -73,4 +88,65 @@ func showSpinner(message string) {
 	step.Spinner.Prefix = "["
 	step.Spinner.Suffix = fmt.Sprintf("] %s", step.Current)
 	step.Spinner.Start()
+}
+
+func renderChainElement(first bool, odd bool, fail bool, text string) {
+	color.Set(color.BgBlack)
+	if fail {
+		color.Set(color.FgRed)
+	} else {
+		color.Set(color.FgGreen)
+	}
+
+	var pre string
+	if odd {
+		pre = " "
+	}
+
+	if first {
+		fmt.Println(pre + " __")
+	}
+
+	fmt.Print(pre + "/  \\")
+
+	if fail {
+		color.Set(color.FgRed)
+	} else {
+		color.Set(color.FgGreen)
+	}
+
+	color.Set(color.FgWhite)
+
+	if odd {
+		fmt.Print("... ")
+	} else {
+		fmt.Print(".... ")
+	}
+
+	if fail {
+		color.Set(color.FgHiRed)
+		fmt.Print(Cross + " ")
+	} else {
+		color.Set(color.FgHiGreen)
+		fmt.Print(CheckMark + " ")
+	}
+
+	color.Set(color.FgHiWhite)
+	fmt.Println(text)
+
+	if fail {
+		color.Set(color.FgRed)
+	} else {
+		color.Set(color.FgGreen)
+	}
+
+	fmt.Println(pre + "\\__/")
+}
+
+func showTrustChain(failAt int) {
+	renderChainElement(true, false, failAt == 0, chainTexts[0])
+	for i := 1; i < len(chainTexts); i++ {
+		renderChainElement(false, i&1 == 1, i >= failAt, chainTexts[i])
+	}
+	color.Unset()
 }
