@@ -27,7 +27,7 @@ func Init() {
 func DumpErr() {
 	buf, ok := Err.(*circbuf.Buffer)
 	if ok {
-		fmt.Print(buf.String())
+		fmt.Fprint(Out, buf.String())
 		buf.Reset()
 	}
 }

@@ -177,6 +177,9 @@ func (c *Client) Post(ctx context.Context, route string, doc interface{}) (jsona
 	var ev jsonapi.Payloader
 
 	for i := 0; i < 3; i += 1 {
+		if i > 0 {
+			logrus.Warnf("Retry %v/3", i+1)
+		}
 		ctx, cancel := context.WithTimeout(ctx, c.PostRequestTimeout)
 		defer cancel()
 		ev, err = c.doPost(ctx, route, doc)
@@ -200,6 +203,9 @@ func (c *Client) Get(ctx context.Context, route string, ifModifiedSince *time.Ti
 	var ev jsonapi.Payloader
 
 	for i := 0; i < 3; i += 1 {
+		if i > 0 {
+			logrus.Warnf("Retry %v/3", i+1)
+		}
 		ctx, cancel := context.WithTimeout(ctx, c.HTTPRequestTimeout)
 		defer cancel()
 		ev, err = c.doGet(ctx, route, ifModifiedSince)
