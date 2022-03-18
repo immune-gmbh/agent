@@ -13,6 +13,7 @@ replace github.com/google/go-licenses => github.com/immune-gmbh/go-licenses v0.0
 require (
 	github.com/StackExchange/wmi v1.2.1
 	github.com/alecthomas/kong v0.2.18
+	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/briandowns/spinner v1.18.0
 	github.com/digitalocean/go-smbios v0.0.0-20180907143718-390a4f403a8e
 	github.com/fatih/color v1.9.0
@@ -24,6 +25,8 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gowebpki/jcs v1.0.0
 	github.com/klauspost/compress v1.13.6
+	github.com/mattn/go-colorable v0.1.4
+	github.com/mattn/go-isatty v0.0.11
 	github.com/shirou/gopsutil v3.21.10+incompatible
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
@@ -39,8 +42,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v0.0.0-20190725054713-01f96b0aa0cd // indirect
-	github.com/mattn/go-colorable v0.1.4 // indirect
-	github.com/mattn/go-isatty v0.0.11 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/otiai10/copy v1.6.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

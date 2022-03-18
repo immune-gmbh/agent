@@ -27,7 +27,7 @@ const (
 
 // SetUIState globally sets the state and thus choses the view that should render
 func SetUIState(state UIState) {
-	if out != io.Discard {
+	if Out != io.Discard {
 		switch state {
 		case StCollectFirmwareInfo:
 			showSpinner("Compile platform security report")
