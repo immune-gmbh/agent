@@ -441,6 +441,7 @@ func run() int {
 
 	// Run the selected subcommand
 	if err := ctx.Run(&glob); err != nil {
+		tui.DumpErr()
 		return 1
 	} else {
 		return 0
@@ -457,7 +458,8 @@ func initUI(forceColors bool, forceLog bool) {
 	}
 
 	if !forceLog && !notty {
-		logrus.SetLevel(logrus.ErrorLevel)
 		tui.Init()
+		logrus.SetLevel(logrus.ErrorLevel)
+		logrus.SetOutput(tui.Err)
 	}
 }

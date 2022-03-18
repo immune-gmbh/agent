@@ -84,7 +84,7 @@ func showSpinner(message string) {
 
 	step = new(Spinner)
 	step.Current = message
-	step.Spinner = spinner.New(spinner.CharSets[9], 100*time.Millisecond, spinner.WithWriter(out))
+	step.Spinner = spinner.New(spinner.CharSets[9], 100*time.Millisecond, spinner.WithWriter(Out))
 	step.Spinner.Prefix = "["
 	step.Spinner.Suffix = fmt.Sprintf("] %s", step.Current)
 	step.Spinner.Start()
