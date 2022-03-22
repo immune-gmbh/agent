@@ -30,10 +30,10 @@ func SetUIState(state UIState) {
 	if Out != io.Discard {
 		switch state {
 		case StCollectFirmwareInfo:
-			showSpinner("Compile platform security report")
+			showSpinner("Compile device security report")
 		case StQuotePCR:
 			completeLastStep(true)
-			showSpinner("Sign platform security report")
+			showSpinner("Sign device security report")
 		case StSendEvidence:
 			completeLastStep(true)
 			showSpinner("Send report to immune Guard cloud")
