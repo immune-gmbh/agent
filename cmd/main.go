@@ -449,10 +449,15 @@ func run() int {
 
 func initUI(forceColors bool, forceLog bool) {
 	notty := os.Getenv("TERM") == "dumb" || (!isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()))
-	if forceColors || !notty {
+
+	// honor NO_COLOR env var as per https://no-color.org/ like the colors library we use does, too
+	_, noColors := os.LookupEnv("NO_COLOR")
+
+	if forceColors || (!notty && !noColors) {
 		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
 		logrus.SetOutput(colorable.NewColorableStdout())
 	} else {
+		logrus.SetFormatter(&logrus.TextFormatter{DisableColors: noColors && !forceColors})
 		logrus.SetOutput(os.Stdout)
 	}
 
