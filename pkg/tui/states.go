@@ -55,7 +55,7 @@ func SetUIState(state UIState) {
 		case StDeviceTrusted:
 			showTrust(true)
 		case StChainAllGood:
-			showTrustChain(-1)
+			showTrustChain(0xFF)
 		case StChainFailSupplyChain:
 			showTrustChain(0)
 		case StChainFailConfiguration:
