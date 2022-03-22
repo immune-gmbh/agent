@@ -12,11 +12,11 @@ replace github.com/google/go-licenses => github.com/immune-gmbh/go-licenses v0.0
 
 require (
 	github.com/StackExchange/wmi v1.2.1
-	github.com/alecthomas/kong v0.2.18
+	github.com/alecthomas/kong v0.5.0
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
-	github.com/briandowns/spinner v1.18.0
+	github.com/briandowns/spinner v1.18.1
 	github.com/digitalocean/go-smbios v0.0.0-20180907143718-390a4f403a8e
-	github.com/fatih/color v1.9.0
+	github.com/fatih/color v1.13.0
 	github.com/fearful-symmetry/gomsr v0.0.1
 	github.com/google/go-licenses v1.0.0
 	github.com/google/go-tpm v0.3.3
@@ -24,13 +24,13 @@ require (
 	github.com/google/jsonapi v1.0.0
 	github.com/google/uuid v1.3.0
 	github.com/gowebpki/jcs v1.0.0
-	github.com/klauspost/compress v1.13.6
-	github.com/mattn/go-colorable v0.1.4
-	github.com/mattn/go-isatty v0.0.11
-	github.com/shirou/gopsutil v3.21.10+incompatible
+	github.com/klauspost/compress v1.15.1
+	github.com/mattn/go-colorable v0.1.12
+	github.com/mattn/go-isatty v0.0.14
+	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/sys v0.0.0-20211205182925-97ca703d548d
+	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8
 )
 
 require (
@@ -50,9 +50,10 @@ require (
 	github.com/spf13/cobra v1.1.3 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/src-d/gcfg v1.4.0 // indirect
-	github.com/tklauser/go-sysconf v0.3.9 // indirect
-	github.com/tklauser/numcpus v0.3.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.10 // indirect
+	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect
+	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0 // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210503060351-7fd8e65b6420 // indirect
