@@ -217,7 +217,7 @@ func (s *SoftwareAnchor) PCRValues(bank tpm2.Algorithm, pcrs []int) (map[string]
 }
 
 func (s *SoftwareAnchor) AllPCRValues() (map[string]map[string]api.Buffer, error) {
-	return nil, errors.New("SoftwareAnchor.AllPCRValues not implemented")
+	return make(map[string]map[string]api.Buffer), nil
 }
 
 func (s *SoftwareAnchor) ReadEKCertificate() (*x509.Certificate, error) {
