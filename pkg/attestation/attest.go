@@ -23,7 +23,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 )
 
-func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State, dumpEvidence bool) (*api.Appraisal, error) {
+func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State, dumpEvidence bool) (*api.Appraisal, string, error) {
 	var conn io.ReadWriteCloser
 	if anch, ok := anchor.(*tcg.TCGAnchor); ok {
 		conn = anch.Conn
@@ -56,7 +56,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	if err != nil {
 		log.Debugf("tcg.PCRValues(glob.TpmConn, pcrSel): %s", err.Error())
 		log.Error("Failed to read selected PCR values")
-		return nil, err
+		return nil, "", err
 	}
 	quotedPCR := []int{}
 	for k := range pcrValues {
@@ -70,7 +70,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	if err != nil {
 		log.Debugf("tcg.AllPCRValues(): %s", err.Error())
 		log.Error("Failed to read all PCR values")
-		return nil, err
+		return nil, "", err
 	}
 
 	// load Root key
@@ -80,7 +80,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	if err != nil {
 		log.Debugf("tcg.CreateAndLoadRoot(..): %s", err.Error())
 		log.Error("Failed to create root key")
-		return nil, err
+		return nil, "", err
 	}
 	defer rootHandle.Flush(anchor)
 
@@ -89,26 +89,26 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	if err != nil {
 		log.Debugf("Name(rootPub): %s", err)
 		log.Error("Internal error while vetting root key. This is a bug, please report it to bugs@immu.ne.")
-		return nil, err
+		return nil, "", err
 	}
 
 	// check the root name. this will change if the endorsement proof value is changed
 	if !api.EqualNames(&rootName, &st.Root.Name) {
 		log.Error("Failed to recreate enrolled root key. Your TPM was reset, please enroll again.")
-		return nil, errors.New("root name changed")
+		return nil, "", errors.New("root name changed")
 	}
 
 	// load AIK
 	aik, ok := st.Keys["aik"]
 	if !ok {
 		log.Errorf("No key suitable for attestation found, please enroll first.")
-		return nil, errors.New("no-aik")
+		return nil, "", errors.New("no-aik")
 	}
 	aikHandle, err := anchor.LoadDeviceKey(rootHandle, st.Root.Auth, aik.Public, aik.Private)
 	if err != nil {
 		log.Debugf("LoadDeviceKey(..): %s", err)
 		log.Error("Failed to load AIK")
-		return nil, err
+		return nil, "", err
 	}
 	defer aikHandle.Flush(anchor)
 	rootHandle.Flush(anchor)
@@ -120,7 +120,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 		if err != nil {
 			log.Debugf("ParseInt failed: %s", err)
 			log.Error("Invalid PCR bank selector")
-			return nil, err
+			return nil, "", err
 		}
 		algs = append(algs, tpm2.Algorithm(alg))
 	}
@@ -131,7 +131,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	if err != nil || (sig.ECC == nil && sig.RSA == nil) {
 		log.Debugf("TPM2_Quote failed: %s", err)
 		log.Error("TPM 2.0 attestation failed")
-		return nil, err
+		return nil, "", err
 	}
 	aikHandle.Flush(anchor)
 
@@ -156,11 +156,11 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	if dumpEvidence {
 		host, err := os.Hostname()
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		path := host + ".evidence.json"
 		if err := ioutil.WriteFile(path, evidenceJSON, 0644); err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		logrus.Infof("Dumped evidence json: %s", path)
 	}
@@ -168,26 +168,26 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	// API call
 	tui.SetUIState(tui.StSendEvidence)
 	logrus.Info("Sending report to immune Guard cloud")
-	attestResp, err := client.Attest(ctx, aik.Credential, evidence)
+	attestResp, webLink, err := client.Attest(ctx, aik.Credential, evidence)
 	// HTTP-level errors
 	if errors.Is(err, api.AuthError) {
 		log.Error("Failed attestation with an authentication error. Please enroll again.")
-		return nil, err
+		return nil, "", err
 	} else if errors.Is(err, api.FormatError) {
 		log.Error("Attestation failed. The server rejected our request. Make sure the agent is up to date.")
-		return nil, err
+		return nil, "", err
 	} else if errors.Is(err, api.NetworkError) {
 		log.Error("Attestation failed. Cannot contact the immune Guard server. Make sure you're connected to the internet.")
-		return nil, err
+		return nil, "", err
 	} else if errors.Is(err, api.ServerError) {
 		log.Error("Attestation failed. The immune Guard server failed to process the request. Please try again later.")
-		return nil, err
+		return nil, "", err
 	} else if errors.Is(err, api.PaymentError) {
 		log.Error("Attestation failed. A payment is required to use the attestation service.")
-		return nil, err
+		return nil, "", err
 	} else if err != nil {
 		log.Error("Attestation failed. An unknown error occured. Please try again later.")
-		return nil, err
+		return nil, "", err
 	}
-	return attestResp, nil
+	return attestResp, webLink, nil
 }

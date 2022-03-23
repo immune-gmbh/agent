@@ -111,37 +111,44 @@ func (c *Client) Enroll(ctx context.Context, enrollToken string, enroll Enrollme
 	return creds, err
 }
 
-func (c *Client) Attest(ctx context.Context, quoteCredential string, ev Evidence) (*Appraisal, error) {
+func (c *Client) Attest(ctx context.Context, quoteCredential string, ev Evidence) (*Appraisal, string, error) {
 	logrus.Traceln("attesting to SaaS")
 	c.Auth = quoteCredential
 
 	pdoc, err := jsonapi.Marshal(&ev)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	doc, ok := pdoc.(*jsonapi.OnePayload)
 	if !ok {
-		return nil, err
+		return nil, "", err
 	}
 	doc.Data.Type = "evidence"
 
 	payload, err := c.Post(ctx, "attest", doc)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	one, ok := payload.(*jsonapi.OnePayload)
 	if !ok || one.Data == nil {
-		return nil, FormatError
+		return nil, "", FormatError
 	}
 	buf, err := json.Marshal(one.Data.Attributes)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	var appr Appraisal
 	err = json.Unmarshal(buf, &appr)
 
-	return &appr, err
+	var webLink string
+	if one.Data.Links != nil {
+		if v, ok := (*one.Data.Links)["self-web"]; ok {
+			webLink, _ = v.(string)
+		}
+	}
+
+	return &appr, webLink, err
 }
 
 // Client.Configuration returns a nil Configuration when lastUpdate is not nil and the server tells us to use a cached configuration
