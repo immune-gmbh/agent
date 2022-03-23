@@ -174,7 +174,7 @@ func (attest *attestCmd) Run(glob *globalOptions) error {
 }
 
 func doAttest(glob *globalOptions, ctx context.Context) error {
-	appraisal, err := attestation.Attest(ctx, &glob.Client, glob.EndorsementAuth, glob.Anchor, glob.State, false)
+	appraisal, webLink, err := attestation.Attest(ctx, &glob.Client, glob.EndorsementAuth, glob.Anchor, glob.State, false)
 	if err != nil {
 		tui.SetUIState(tui.StAttestationFailed)
 		return err
@@ -200,6 +200,11 @@ func doAttest(glob *globalOptions, ctx context.Context) error {
 		} else if !appraisal.Verdict.EndpointProtection {
 			tui.SetUIState(tui.StChainFailEndpointProtection)
 		}
+	}
+
+	tui.ShowAppraisalLink(webLink)
+	if webLink != "" {
+		logrus.Infof("See detailed results here: %s", webLink)
 	}
 
 	if appraisal, err := json.MarshalIndent(*appraisal, "", "  "); err == nil {

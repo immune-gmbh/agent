@@ -30,6 +30,7 @@ var (
 	InfoStyle    = color.New(color.FgCyan, color.BgBlack, color.Bold).SprintFunc()
 	SuccessStyle = color.New(color.FgGreen, color.BgBlack, color.Bold).SprintFunc()
 	FailureStyle = color.New(color.FgRed, color.BgBlack, color.Bold).SprintFunc()
+	LinkStyle    = color.New(color.Underline).SprintFunc()
 )
 
 // platform dependent strings
@@ -149,4 +150,10 @@ func showTrustChain(failAt int) {
 		renderChainElement(false, i&1 == 1, i >= failAt, chainTexts[i])
 	}
 	color.Unset()
+}
+
+func ShowAppraisalLink(link string) {
+	if link != "" {
+		printf("\nSee detailed results here:\n%s\n", LinkStyle(link))
+	}
 }
