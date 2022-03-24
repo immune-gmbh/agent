@@ -5,8 +5,12 @@ import (
 	"io"
 )
 
-const DefaultTPMDevice = "none"
+const defaultTPMDevice = "none"
 
-func openTPM(tpmPath string) (io.ReadWriteCloser, error) {
+func DefaultTPMDevice() string {
+	return defaultTPMDevice
+}
+
+func osOpenTPM(tpmPath string) (io.ReadWriteCloser, error) {
 	return nil, fmt.Errorf("Not implemented yet")
 }
