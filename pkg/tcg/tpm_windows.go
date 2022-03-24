@@ -6,9 +6,8 @@ import (
 	"github.com/google/go-tpm/tpmutil"
 )
 
-const DefaultTPMDevice = "none"
-
-func openTPM(tpmPath string) (io.ReadWriteCloser, error) {
+func osOpenTPM(tpmPath string) (io.ReadWriteCloser, error) {
+	_ = tpmPath
 	conn, err := tpmutil.OpenTPM()
 	if err != nil {
 		return nil, err

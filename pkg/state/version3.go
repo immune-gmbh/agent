@@ -31,16 +31,15 @@ type StubState struct {
 type StateV3 struct {
 	Ty string `json:"type"`
 
-	// v3.1 (deprecated)
-	StubSeed api.Buffer `json:"stub-seed,omitempty"`
-	// v3.2
-	StubState *StubState `json:"stub-state,omitempty"`
+	StubSeed  api.Buffer `json:"stub-seed,omitempty"`  // v3.1 (deprecated)
+	StubState *StubState `json:"stub-state,omitempty"` // v3.2
 
 	// /v2/enroll
 	Keys                   map[string]DeviceKeyV3 `json:"keys"`
 	Root                   RootKeyV3              `json:"root"`
 	EndorsementKey         api.PublicKey          `json:"ek"`
 	EndorsementCertificate *api.Certificate       `json:"ek-certificate"`
+	TPM                    string                 `json:"tpm,omitempty"` // v3.3
 
 	// /v2/configuration
 	LastUpdate time.Time         `json:"last_update,string"`

@@ -22,6 +22,8 @@ const (
 	// DefaultVendorSubdir is the name of the subdirectory we create in various common locations (f.e. /var, /etc) to store our data
 	// note: if you change this name, you also have to modify the reference in the windows installer wix main xml file
 	DefaultVendorSubdir string = "immune-guard"
+
+	DummyTPMIdentifier string = "dummy"
 )
 
 var (
@@ -38,31 +40,48 @@ func (s *State) EnsureFresh(cl *api.Client) (bool, error) {
 	return (*StateV3)(s).EnsureFresh(cl)
 }
 
-func LoadState(dir string) (*State, error) {
+// LoadState returns a loaded state and a bool if it has been updated or error
+func LoadState(dir string) (*State, bool, error) {
 	logrus.Traceln("load on-disk state")
 	keysPath := path.Join(dir, "keys")
 	if _, err := os.Stat(keysPath); os.IsNotExist(err) {
-		return nil, ErrNotExist
+		return nil, false, ErrNotExist
 	} else if os.IsPermission(err) {
-		return nil, ErrNoPerm
+		return nil, false, ErrNoPerm
 	} else if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	file, err := ioutil.ReadFile(keysPath)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	return migrateState(file)
 }
 
-func migrateState(raw []byte) (*State, error) {
+// returns true when there was no tpm selection before
+func selectTPM(st *State) bool {
+	// if our state does not contain a TPM path do a best-effort default selection
+	if st.TPM == "" {
+		if st.StubState != nil {
+			st.TPM = DummyTPMIdentifier
+		} else {
+			st.TPM = DefaultTPMDevice()
+		}
+		return true
+	}
+
+	return false
+}
+
+// the bool is true when the state has been updated
+func migrateState(raw []byte) (*State, bool, error) {
 	var dict map[string]interface{}
 
 	if err := json.Unmarshal(raw, &dict); err != nil {
 		log.Debugf("State file is not a JSON dict: %s", err)
-		return nil, ErrInvalid
+		return nil, false, ErrInvalid
 	}
 
 	if val, ok := dict["type"]; ok {
@@ -71,18 +90,20 @@ func migrateState(raw []byte) (*State, error) {
 			case ClientStateTypeV2:
 				log.Debugf("Migrating state from v2 to v3")
 				if st3, err := migrateStateV2(raw); err != nil {
-					return nil, err
+					return nil, false, err
 				} else {
 					st := State(*st3)
-					return &st, err
+					selectTPM(&st)
+					return &st, true, err
 				}
 			case ClientStateTypeV3:
 				var st State
 				err := json.Unmarshal(raw, &st)
-				return &st, err
+				update := selectTPM(&st)
+				return &st, update, err
 			default:
 				log.Debugf("Unknown state type '%s'", str)
-				return nil, ErrInvalid
+				return nil, false, ErrInvalid
 			}
 		} else {
 			log.Debugf("State file type is not a string")
@@ -91,7 +112,7 @@ func migrateState(raw []byte) (*State, error) {
 		log.Debugf("State file has no type")
 	}
 
-	return nil, ErrInvalid
+	return nil, false, ErrInvalid
 }
 
 func (st *State) Store(keysPath string) error {

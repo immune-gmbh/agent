@@ -20,7 +20,6 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
 
-	tpm1 "github.com/google/go-tpm/tpm"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/attestation"
@@ -73,7 +72,6 @@ type rootCmd struct {
 	Server   *url.URL    `name:"server" help:"immune SaaS API URL" default:"${server_default_url}" type:"*url.URL"`
 	CA       string      `name:"server-ca" help:"immune SaaS API CA (PEM encoded)" optional type:"path"`
 	StateDir string      `name:"state-dir" default:"${state_default_dir}" help:"Directory holding the cli state" type:"path"`
-	TPM      string      `name:"tpm" default:"${tpm_default_path}" help:"TPM device: device path (${tpm_default_path}) or mssim, sgx, swtpm/net url (mssim://localhost, sgx://localhost, net://localhost:1234)"`
 	LogFlag  bool        `name:"log" help:"Force log output on and text UI off"`
 	Verbose  verboseFlag `help:"Enable verbose mode. Implies --log"`
 	Trace    traceFlag   `hidden`
@@ -89,6 +87,7 @@ type enrollCmd struct {
 	NoAttest bool   `help:"Don't attest after successful enrollment." default:"false"`
 	Token    string `arg:"" required:"" name:"token" help:"Enrollment authentication token"`
 	Name     string `arg:"" optional:"" name:"name hint" help:"Name to assign to the device. May get suffixed by a counter if already taken. Defaults to the hostname."`
+	TPM      string `name:"tpm" default:"${tpm_default_path}" help:"TPM device: device path (${tpm_default_path}) or mssim, sgx, swtpm/net url (mssim://localhost, sgx://localhost, net://localhost:1234) or 'dummy' for dummy TPM"`
 }
 
 type attestCmd struct {
@@ -102,23 +101,28 @@ type reportCmd struct {
 func (enroll *enrollCmd) Run(glob *globalOptions) error {
 	ctx := context.Background()
 
-	if err := loadFreshState(cli.StateDir, glob); err != nil {
+	// XXX detect TPM here and handle no-access and not-found errors
+	//logrus.Warnf("Cannot find a hardware trust anchor. Fall back to software-only")
+
+	if err := initState(cli.StateDir, glob); err != nil {
 		logrus.Debugf("loadFreshState(cli.StateDir, glob): %s", err.Error())
 		logrus.Error("Cannot restore state")
 		return err
 	}
-	if err := openAndClearTPM(cli.TPM, glob); err != nil {
+	glob.State.TPM = enroll.TPM
+	a, err := tcg.OpenTPM(glob.State.TPM, glob.State.StubState)
+	if err != nil {
 		logrus.Debugf("openAndClearTPM(cli.TPM, glob): %s", err.Error())
-		logrus.Error("Cannot connect to TPM")
+		logrus.Errorf("Cannot open TPM: %s", glob.State.TPM)
 		return err
 	}
+	glob.Anchor = a
 
 	if err := attestation.Enroll(ctx, &glob.Client, enroll.Token, glob.EndorsementAuth, defaultNameHint, glob.Anchor, glob.State); err != nil {
 		tui.SetUIState(tui.StEnrollFailed)
 		return err
 	}
 
-	// XXX
 	if stub, ok := glob.Anchor.(*tcg.SoftwareAnchor); ok {
 		if st, err := stub.Store(); err != nil {
 			logrus.Debugf("SoftwareAnchor.Store: %s", err)
@@ -148,7 +152,7 @@ func (attest *attestCmd) Run(glob *globalOptions) error {
 	ctx := context.Background()
 
 	// fetch/refresh configuration
-	if err := loadFreshState(cli.StateDir, glob); err != nil {
+	if err := initState(cli.StateDir, glob); err != nil {
 		logrus.Debugf("loadFreshState(cli.StateDir, glob): %s", err.Error())
 		logrus.Error("Cannot restore state")
 		return err
@@ -160,15 +164,13 @@ func (attest *attestCmd) Run(glob *globalOptions) error {
 	}
 
 	// open TPM connection
-	if glob.Anchor == nil {
-		if err := openAndClearTPM(cli.TPM, glob); err != nil {
-			logrus.Debugf("openAndClearTPM(cli.TPM, glob): %s", err.Error())
-			logrus.Error("Cannot connect to TPM")
-			return err
-		}
-	} else {
-		glob.Anchor.FlushAllHandles()
+	a, err := tcg.OpenTPM(glob.State.TPM, glob.State.StubState)
+	if err != nil {
+		logrus.Debugf("openAndClearTPM(cli.TPM, glob): %s", err.Error())
+		logrus.Errorf("Cannot open TPM: %s", glob.State.TPM)
+		return err
 	}
+	glob.Anchor = a
 
 	return doAttest(glob, ctx)
 }
@@ -216,7 +218,7 @@ func doAttest(glob *globalOptions, ctx context.Context) error {
 
 func (report *reportCmd) Run(glob *globalOptions) error {
 	// fetch/refresh configuration
-	if err := loadFreshState(cli.StateDir, glob); err != nil {
+	if err := initState(cli.StateDir, glob); err != nil {
 		logrus.Error("Cannot restore state")
 		return err
 	}
@@ -227,9 +229,12 @@ func (report *reportCmd) Run(glob *globalOptions) error {
 	}
 
 	// collect firmware info
-	if err := openAndClearTPM(cli.TPM, glob); err != nil {
-		logrus.Warn("Cannot connect to TPM")
+	a, err := tcg.OpenTPM(glob.State.TPM, glob.State.StubState)
+	if err != nil {
+		logrus.Debugf("openAndClearTPM(cli.TPM, glob): %s", err.Error())
+		logrus.Warnf("Cannot open TPM: %s", glob.State.TPM)
 	}
+	glob.Anchor = a
 	var conn io.ReadWriteCloser
 	if anch, ok := glob.Anchor.(*tcg.TCGAnchor); ok {
 		conn = anch.Conn
@@ -282,83 +287,6 @@ func (report *reportCmd) Run(glob *globalOptions) error {
 	return nil
 }
 
-// load and migrate on-disk state
-func loadFreshState(stateDir string, glob *globalOptions) error {
-	st, err := state.LoadState(stateDir)
-	if errors.Is(err, state.ErrNotExist) {
-		logrus.Info("No previous state found")
-		glob.State = state.NewState()
-	} else if errors.Is(err, state.ErrNoPerm) {
-		logrus.Error("Cannot read state, no permissions")
-		return err
-	} else if err != nil {
-		return err
-	} else {
-		glob.State = st
-	}
-
-	update, err := glob.State.EnsureFresh(&glob.Client)
-	if err != nil {
-		logrus.Debugf("Fetching fresh config: %s", err)
-		return err
-	}
-
-	if update {
-		logrus.Debugf("Storing new config from server")
-		if err := glob.State.Store(path.Join(cli.StateDir, "keys")); err != nil {
-			logrus.Debugf("Store(%s): %s", cli.StateDir, err)
-			return err
-		}
-	}
-
-	return nil
-}
-
-// open TPM 2.0 connection and flush stale handles
-func openAndClearTPM(tpmUrl string, glob *globalOptions) error {
-	conn, err := tcg.OpenTPM(tpmUrl)
-	if err != nil {
-		logrus.Debugf("Cannot open TPM '%s': %s", tpmUrl, err)
-
-		logrus.Warnf("Cannot find a hardware trust anchor. Fall back to software-only")
-		if glob.State.StubState != nil {
-			anch, err := tcg.LoadSoftwareAnchor(glob.State.StubState)
-			if err != nil {
-				logrus.Debugf("Cannot load previous Stub TPM state: %s", err)
-				glob.State.StubState = nil
-			} else {
-				glob.Anchor = anch
-			}
-		}
-
-		if glob.Anchor == nil {
-			anch, err := tcg.NewSoftwareAnchor()
-			if err != nil {
-				logrus.Debugf("Cannot initalize new Stub TPM: %s", err)
-				return err
-			}
-			glob.Anchor = anch
-		}
-	} else {
-		// try to get TPM2 family indicator (should be 2.0) to test if this is a TPM2
-		_, err := tcg.GetTPM2FamilyIndicator(conn)
-		if err != nil {
-			_, err := tpm1.GetCapVersionVal(conn)
-			if err != nil {
-				logrus.Warn("Unsupported TPM version: 1.2")
-				return errors.New("TPM1.2 is not supported")
-			}
-		}
-
-		glob.Anchor = tcg.NewTCGAnchor(conn)
-	}
-
-	// We need all memory the TPM can offer
-	glob.Anchor.FlushAllHandles()
-
-	return nil
-}
-
 func main() {
 	os.Exit(run())
 }
@@ -400,7 +328,7 @@ func run() int {
 			Summary: true,
 		}),
 		kong.Vars{
-			"tpm_default_path":   "system",
+			"tpm_default_path":   state.DefaultTPMDevice(),
 			"state_default_dir":  stateDir,
 			"server_default_url": "https://api.immu.ne/v2",
 		},
@@ -473,4 +401,47 @@ func initUI(forceColors bool, forceLog bool) {
 		logrus.SetLevel(logrus.ErrorLevel)
 		logrus.SetOutput(tui.Err)
 	}
+}
+
+// load and migrate on-disk state
+func initState(stateDir string, glob *globalOptions) error {
+	// XXX fix this directory confusion once and for all; also see cli.StateDir...
+	statePath := path.Join(stateDir, "keys")
+
+	// load and migrate state
+	st, update, err := state.LoadState(stateDir)
+	if errors.Is(err, state.ErrNotExist) {
+		logrus.Info("No previous state found")
+		glob.State = state.NewState()
+	} else if errors.Is(err, state.ErrNoPerm) {
+		logrus.Error("Cannot read state, no permissions")
+		return err
+	} else if err != nil {
+		return err
+	} else {
+		glob.State = st
+	}
+	if update {
+		logrus.Debugf("Migrating state file to newest version")
+		if err := glob.State.Store(statePath); err != nil {
+			logrus.Debugf("Store(%s): %s", cli.StateDir, err)
+			return err
+		}
+	}
+
+	// see if the server has a new config for us
+	update, err = glob.State.EnsureFresh(&glob.Client)
+	if err != nil {
+		logrus.Debugf("Fetching fresh config: %s", err)
+		return err
+	}
+	if update {
+		logrus.Debugf("Storing new config from server")
+		if err := glob.State.Store(statePath); err != nil {
+			logrus.Debugf("Store(%s): %s", cli.StateDir, err)
+			return err
+		}
+	}
+
+	return nil
 }

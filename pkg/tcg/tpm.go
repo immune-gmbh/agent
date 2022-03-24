@@ -11,10 +11,12 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	tpm1 "github.com/google/go-tpm/tpm"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpmutil"
 	"github.com/google/go-tpm/tpmutil/mssim"
 	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg/sgxtpm"
 )
 
@@ -300,33 +302,92 @@ func FlushTransientHandles(conn io.ReadWriteCloser) error {
 	return nil
 }
 
-// OpenTPM opens a connection to the TPM.
-func OpenTPM(tpmPath string) (io.ReadWriteCloser, error) {
-	if tpmPath == "builtin" {
-		return NewSimulator()
-	}
-	if tpmPath == "system" {
-		if runtime.GOOS == "windows" {
-			return openTPM("")
-		} else {
-			return openTPM("/dev/tpm0")
+func stubTPM(stubState *state.StubState) (anchor TrustAnchor, err error) {
+	if stubState != nil {
+		anchor, err = LoadSoftwareAnchor(stubState)
+		if err != nil {
+			logrus.Debugf("Cannot load previous Stub TPM state: %s", err)
+			stubState = nil
 		}
 	}
 
-	url, err := url.Parse(tpmPath)
+	if anchor == nil {
+		anchor, err = NewSoftwareAnchor()
+		if err != nil {
+			logrus.Debugf("Cannot initalize new Stub TPM: %s", err)
+		}
+	}
+	return
+}
+
+func assertNotTPM1(conn io.ReadWriteCloser) error {
+	// try to get TPM2 family indicator (should be 2.0) to test if this is a TPM2
+	_, err := GetTPM2FamilyIndicator(conn)
 	if err != nil {
-		return nil, err
+		_, err := tpm1.GetCapVersionVal(conn)
+		if err != nil {
+			logrus.Warn("Unsupported TPM version: 1.2")
+			return errors.New("TPM1.2 is not supported")
+		}
 	}
-	switch url.Scheme {
-	case mssimURLScheme:
-		return openMsimTPM(url)
-	case sgxTpmURLScheme:
-		return openSgxTPM(url)
-	case netTpmURLScheme:
-		return openNetTPM(url)
+
+	return nil
+}
+
+// OpenTPM opens a trust anchor
+func OpenTPM(tpmPath string, stubState *state.StubState) (anchor TrustAnchor, err error) {
+	var rwc io.ReadWriteCloser
+
+	switch tpmPath {
+	case "dummy":
+		anchor, err = stubTPM(stubState)
+		return
+
+	case "builtin":
+		rwc, err = NewSimulator()
+
+	case "system":
+		if runtime.GOOS == "windows" {
+			rwc, err = osOpenTPM("")
+		} else {
+			err = errors.New("invalid TPM selection")
+		}
+
+	// decode URL schemes and VFS paths
 	default:
-		return openTPM(tpmPath)
+		var u *url.URL
+		u, err = url.Parse(tpmPath)
+		if err != nil {
+			break
+		}
+		switch u.Scheme {
+		case mssimURLScheme:
+			rwc, err = openMsimTPM(u)
+		case sgxTpmURLScheme:
+			rwc, err = openSgxTPM(u)
+		case netTpmURLScheme:
+			rwc, err = openNetTPM(u)
+		default:
+			if runtime.GOOS == "windows" {
+				err = errors.New("invalid TPM selection")
+				break
+			}
+
+			rwc, err = osOpenTPM(tpmPath)
+		}
 	}
+
+	if err != nil {
+		return
+	}
+
+	err = assertNotTPM1(rwc)
+	anchor = NewTCGAnchor(rwc)
+
+	// We need all memory the TPM can offer
+	anchor.FlushAllHandles()
+
+	return
 }
 
 // Comptes the TCG Name and Qualified Name of TPM 2.0 entities.

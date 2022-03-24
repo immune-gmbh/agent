@@ -13,7 +13,12 @@ const (
 	// gloablProgramStateDir stores programatically generated state
 	gloablProgramStateDir string = "/var/lib"
 	localProgramStateDir  string = ".local/share"
+	defaultTPMDevice      string = "/dev/tpm0"
 )
+
+func DefaultTPMDevice() string {
+	return defaultTPMDevice
+}
 
 // DefaultStateDir returns all candidates for the config data dir in order of
 // writing.
