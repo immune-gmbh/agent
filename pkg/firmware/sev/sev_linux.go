@@ -19,6 +19,9 @@ func runSEVCommand(command, readLength uint32) ([]byte, error) {
 	if readLength == 0 {
 		return nil, errors.New("readLength is 0")
 	}
+	if readLength > 0x10000 {
+		return nil, errors.New("readLength is too large")
+	}
 
 	fd, err := os.OpenFile(defaultSEVDevice, os.O_RDONLY, 0)
 	if err != nil {
