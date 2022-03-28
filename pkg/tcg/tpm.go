@@ -1,6 +1,7 @@
 package tcg
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	tpm1 "github.com/google/go-tpm/tpm"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpmutil"
 	"github.com/google/go-tpm/tpmutil/mssim"
@@ -30,6 +32,41 @@ const (
 	maxCapapilityAlgs   = ((maxCababilityBuffer - 8) / 8)
 	maxTpmProperties    = ((maxCababilityBuffer - 8) / 8)
 )
+
+type TCGVendorID uint32
+
+var vendors = map[string]uint32{
+	"AMD":                    1095582720,
+	"Atmel":                  1096043852,
+	"Broadcom":               1112687437,
+	"IBM":                    1229081856,
+	"HPE":                    1213220096,
+	"Microsoft":              1297303124,
+	"Infineon":               1229346816,
+	"Intel":                  1229870147,
+	"Lenovo":                 1279610368,
+	"National Semiconductor": 1314082080,
+	"Nationz":                1314150912,
+	"Nuvoton Technology":     1314145024,
+	"Qualcomm":               1363365709,
+	"SMSC":                   1397576515,
+	"ST Microelectronics":    1398033696,
+	"Samsung":                1397576526,
+	"Sinosun":                1397641984,
+	"Texas Instruments":      1415073280,
+	"Winbond":                1464156928,
+	"Fuzhou Rockchip":        1380926275,
+	"Google":                 1196379975,
+}
+
+func TCGVendor(id uint32) *string {
+	for key, value := range vendors {
+		if value == id {
+			return &key
+		}
+	}
+	return nil
+}
 
 type TCGHandle struct {
 	Handle tpmutil.Handle
@@ -53,6 +90,40 @@ func (a *TCGAnchor) FlushAllHandles() {
 
 func (a *TCGAnchor) Close() {
 	a.Conn.Close()
+}
+
+func (a *TCGAnchor) DeviceInformation() (string, error) {
+	var spec string
+	var vendor uint32
+	_, err := GetTPM2FamilyIndicator(a.Conn)
+	if err == nil {
+		vendor, err = GetTPM2ManufacturerIndicator(a.Conn)
+		if err != nil {
+			return "", err
+		}
+		spec = "2.0"
+	}
+	_, err = tpm1.GetCapVersionVal(a.Conn)
+	if err == nil {
+		name, err := tpm1.GetManufacturer(a.Conn)
+		if err != nil {
+			return "", err
+		}
+		vendor = binary.LittleEndian.Uint32(name)
+		spec = "1.2"
+	}
+	switch vendor {
+	case vendors["AMD"]:
+		return fmt.Sprintf("AMD fTPM %s", spec), nil
+	case vendors["Intel"]:
+		return fmt.Sprintf("Intel PTT %s", spec), nil
+	default:
+		v := TCGVendor(vendor)
+		if v != nil {
+			return "", fmt.Errorf("TPM manufacturer not in list")
+		}
+		return fmt.Sprintf("%s TPM %s", *v, spec), nil
+	}
 }
 
 func (a *TCGAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffer, banks []tpm2.Algorithm, pcrs []int) (api.Attest, api.Signature, error) {
@@ -236,6 +307,10 @@ func Property(conn io.ReadWriteCloser, prop uint32) (uint32, error) {
 
 func GetTPM2FamilyIndicator(conn io.ReadWriteCloser) (uint32, error) {
 	return Property(conn, uint32(tpm2.FamilyIndicator))
+}
+
+func GetTPM2ManufacturerIndicator(conn io.ReadWriteCloser) (uint32, error) {
+	return Property(conn, uint32(tpm2.Manufacturer))
 }
 
 func openNetTPM(url *url.URL) (io.ReadWriteCloser, error) {

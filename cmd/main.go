@@ -95,8 +95,9 @@ type attestCmd struct {
 }
 
 type reportCmd struct {
-	Show bool   `help:"Show output instead of writing it to file" default:"false"`
-	Out  string `arg:"" optional:"" name:"out" default:"." help:"Absolute directory path to newly generated report" type:"path"`
+	Show        bool   `help:"Show output instead of writing it to file" default:"false"`
+	TrustAnchor bool   `help:"Show human readable trust anchor information" default:"false"`
+	Out         string `arg:"" optional:"" name:"out" default:"." help:"Absolute directory path to newly generated report" type:"path"`
 }
 
 func (enroll *enrollCmd) Run(glob *globalOptions) error {
@@ -275,6 +276,13 @@ func (report *reportCmd) Run(glob *globalOptions) error {
 			return err
 		}
 		logrus.Infof("Report created: %s", path)
+	} else if report.TrustAnchor {
+		trustAnchor, err := glob.Anchor.DeviceInformation()
+		if err != nil {
+
+		} else {
+			fmt.Println(trustAnchor)
+		}
 	} else {
 		fmt.Println(string(evidenceJSON))
 	}
