@@ -78,6 +78,18 @@ func showStepDone(message string, success bool) {
 	printf("[%s] %s\n", status, message)
 }
 
+// ShowTrustAnchor shows trust anchor string
+func ShowTrustAnchor(tcg string) {
+	status := SuccessStyle(CheckMark)
+	printf("[%s] Using: %s\n", status, tcg)
+}
+
+// NoTrustAnchorFound shows error about no trust anchor found
+func NoTrustAnchorFound(message string) {
+	status := FailureStyle(Cross)
+	printf("[%s] %s\n", status, message)
+}
+
 func showSpinner(message string) {
 	if haveSpinner() {
 		killSpinner()

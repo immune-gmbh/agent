@@ -30,4 +30,5 @@ type TrustAnchor interface {
 
 	FlushAllHandles()
 	Close()
+	DeviceName() (string, error)
 }

@@ -10,6 +10,8 @@ const (
 	StSendEvidence
 	StAttestationSuccess
 	StAttestationFailed
+	StSelectTASuccess
+	StSelectTAFailed
 	StCreateKeys
 	StEnrollKeys
 	StEnrollSuccess
@@ -42,6 +44,10 @@ func SetUIState(state UIState) {
 			showStepDone("Attestation successful", true)
 		case StAttestationFailed:
 			showStepDone("Attestation failed", false)
+		case StSelectTASuccess:
+			showStepDone("Secure Trust Anchor found", true)
+		case StSelectTAFailed:
+			showStepDone("No Secure Trust Anchor found", false)
 		case StCreateKeys:
 			showSpinner("Generate keys")
 		case StEnrollKeys:

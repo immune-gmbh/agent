@@ -86,18 +86,19 @@ type rootCmd struct {
 }
 
 type enrollCmd struct {
-	NoAttest bool   `help:"Don't attest after successful enrollment." default:"false"`
-	Token    string `arg:"" required:"" name:"token" help:"Enrollment authentication token"`
-	Name     string `arg:"" optional:"" name:"name hint" help:"Name to assign to the device. May get suffixed by a counter if already taken. Defaults to the hostname."`
+	NoAttest   bool   `help:"Don't attest after successful enrollment." default:"false"`
+	Token      string `arg:"" required:"" name:"token" help:"Enrollment authentication token"`
+	Name       string `arg:"" optional:"" name:"name hint" help:"Name to assign to the device. May get suffixed by a counter if already taken. Defaults to the hostname."`
+	ForceSWTPM bool   `help:"Enforce usage of the insecure Software TPM as trust anchor." default:"false"`
 }
 
 type attestCmd struct {
+	ForceSWTPM bool `help:"Enforce usage of the insecure Software TPM as trust anchor." default:"false"`
 }
 
 type reportCmd struct {
-	Show        bool   `help:"Show output instead of writing it to file" default:"false"`
-	TrustAnchor bool   `help:"Show human readable trust anchor information" default:"false"`
-	Out         string `arg:"" optional:"" name:"out" default:"." help:"Absolute directory path to newly generated report" type:"path"`
+	Show bool   `help:"Show output instead of writing it to file" default:"false"`
+	Out  string `arg:"" optional:"" name:"out" default:"." help:"Absolute directory path to newly generated report" type:"path"`
 }
 
 func (enroll *enrollCmd) Run(glob *globalOptions) error {
@@ -108,9 +109,8 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 		logrus.Error("Cannot restore state")
 		return err
 	}
-	if err := openAndClearTPM(cli.TPM, glob); err != nil {
+	if err := openAndClearTPM(cli.TPM, glob, enroll.ForceSWTPM); err != nil {
 		logrus.Debugf("openAndClearTPM(cli.TPM, glob): %s", err.Error())
-		logrus.Error("Cannot connect to TPM")
 		return err
 	}
 
@@ -162,9 +162,8 @@ func (attest *attestCmd) Run(glob *globalOptions) error {
 
 	// open TPM connection
 	if glob.Anchor == nil {
-		if err := openAndClearTPM(cli.TPM, glob); err != nil {
+		if err := openAndClearTPM(cli.TPM, glob, attest.ForceSWTPM); err != nil {
 			logrus.Debugf("openAndClearTPM(cli.TPM, glob): %s", err.Error())
-			logrus.Error("Cannot connect to TPM")
 			return err
 		}
 	} else {
@@ -228,7 +227,7 @@ func (report *reportCmd) Run(glob *globalOptions) error {
 	}
 
 	// collect firmware info
-	if err := openAndClearTPM(cli.TPM, glob); err != nil {
+	if err := openAndClearTPM(cli.TPM, glob, false); err != nil {
 		logrus.Warn("Cannot connect to TPM")
 	}
 	var conn io.ReadWriteCloser
@@ -276,13 +275,6 @@ func (report *reportCmd) Run(glob *globalOptions) error {
 			return err
 		}
 		logrus.Infof("Report created: %s", path)
-	} else if report.TrustAnchor {
-		trustAnchor, err := glob.Anchor.DeviceInformation()
-		if err != nil {
-
-		} else {
-			fmt.Println(trustAnchor)
-		}
 	} else {
 		fmt.Println(string(evidenceJSON))
 	}
@@ -323,12 +315,9 @@ func loadFreshState(stateDir string, glob *globalOptions) error {
 }
 
 // open TPM 2.0 connection and flush stale handles
-func openAndClearTPM(tpmUrl string, glob *globalOptions) error {
+func openAndClearTPM(tpmUrl string, glob *globalOptions, swtpm bool) error {
 	conn, err := tcg.OpenTPM(tpmUrl)
-	if err != nil {
-		logrus.Debugf("Cannot open TPM '%s': %s", tpmUrl, err)
-
-		logrus.Warnf("Cannot find a hardware trust anchor. Fall back to software-only")
+	if err != nil && swtpm {
 		if glob.State.StubState != nil {
 			anch, err := tcg.LoadSoftwareAnchor(glob.State.StubState)
 			if err != nil {
@@ -337,28 +326,46 @@ func openAndClearTPM(tpmUrl string, glob *globalOptions) error {
 			} else {
 				glob.Anchor = anch
 			}
-		}
-
-		if glob.Anchor == nil {
-			anch, err := tcg.NewSoftwareAnchor()
-			if err != nil {
-				logrus.Debugf("Cannot initalize new Stub TPM: %s", err)
-				return err
+			if glob.Anchor == nil {
+				anch, err := tcg.NewSoftwareAnchor()
+				if err != nil {
+					logrus.Debugf("Cannot initalize new Stub TPM: %s", err)
+					return err
+				}
+				glob.Anchor = anch
 			}
-			glob.Anchor = anch
+			tui.SetUIState(tui.StSelectTASuccess)
+			tcg, err := glob.Anchor.DeviceName()
+			if err == nil {
+				tui.ShowTrustAnchor(tcg)
+			}
+		} else {
+			tui.SetUIState(tui.StSelectTAFailed)
+			tui.NoTrustAnchorFound("Couldn't initialize Software TPM")
+			return errors.New("unable to initialize Software TPM")
 		}
+	} else if err != nil && !swtpm {
+		tui.SetUIState(tui.StSelectTAFailed)
+		tui.NoTrustAnchorFound("Please check your BIOS/UEFI/BMC settings for AMD fTPM and Intel PTT support.\n    If you are unsure what to do, contact us via support@immu.ne.")
+		return errors.New("no trust anchor found")
 	} else {
 		// try to get TPM2 family indicator (should be 2.0) to test if this is a TPM2
 		_, err := tcg.GetTPM2FamilyIndicator(conn)
 		if err != nil {
 			_, err := tpm1.GetCapVersionVal(conn)
 			if err != nil {
+				tui.SetUIState(tui.StSelectTAFailed)
+				tui.NoTrustAnchorFound("Found unsupported TPM 1.2. Please contact us via sales@immu.ne")
 				logrus.Warn("Unsupported TPM version: 1.2")
 				return errors.New("TPM1.2 is not supported")
 			}
 		}
-
 		glob.Anchor = tcg.NewTCGAnchor(conn)
+		tui.SetUIState(tui.StSelectTASuccess)
+		tcg, err := glob.Anchor.DeviceName()
+		if err == nil {
+			tui.ShowTrustAnchor(tcg)
+		}
 	}
 
 	// We need all memory the TPM can offer

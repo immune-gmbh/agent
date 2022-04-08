@@ -92,7 +92,7 @@ func (a *TCGAnchor) Close() {
 	a.Conn.Close()
 }
 
-func (a *TCGAnchor) DeviceInformation() (string, error) {
+func (a *TCGAnchor) DeviceName() (string, error) {
 	var spec string
 	var vendor uint32
 	_, err := GetTPM2FamilyIndicator(a.Conn)
@@ -119,7 +119,7 @@ func (a *TCGAnchor) DeviceInformation() (string, error) {
 		return fmt.Sprintf("Intel PTT %s", spec), nil
 	default:
 		v := TCGVendor(vendor)
-		if v != nil {
+		if v == nil {
 			return "", fmt.Errorf("TPM manufacturer not in list")
 		}
 		return fmt.Sprintf("%s TPM %s", *v, spec), nil

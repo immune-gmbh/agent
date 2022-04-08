@@ -142,6 +142,10 @@ func (s *SoftwareAnchor) Close() {
 	return
 }
 
+func (s *SoftwareAnchor) DeviceName() (string, error) {
+	return "Software TPM 2.0", nil
+}
+
 func (a *SoftwareAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffer, banks []tpm2.Algorithm, pcrs []int) (api.Attest, api.Signature, error) {
 	aikH := aikHandle.(*SoftwareHandle)
 	if aikH.ty != "dev" {
