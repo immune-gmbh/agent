@@ -3,8 +3,6 @@ package util
 import (
 	"errors"
 	"fmt"
-	"os"
-	"os/user"
 	"runtime"
 	"syscall"
 
@@ -59,18 +57,8 @@ func IsKernelModuleLoaded(name string) (bool, error) {
 }
 
 func IsRoot() (ret bool, err error) {
-	currentUser, err := user.Current()
-	ret = false
-	if err != nil {
-		return
-	}
-
-	hostName, err := os.Hostname()
-	if err != nil {
-		return
-	}
-
-	ret = currentUser.Username == fmt.Sprintf("%s\\Administrator", hostName)
+	// this needs a more functional solution soon
+	ret = true
 	return
 }
 

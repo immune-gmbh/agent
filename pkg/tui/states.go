@@ -14,6 +14,7 @@ const (
 	StEnrollKeys
 	StEnrollSuccess
 	StEnrollFailed
+	StNoRoot
 	StDeviceVulnerable
 	StDeviceTrusted
 	StChainAllGood
@@ -50,6 +51,8 @@ func SetUIState(state UIState) {
 			showStepDone("Enrollment successful", true)
 		case StEnrollFailed:
 			showStepDone("Enrollment failed", false)
+		case StNoRoot:
+			showStepDone("Program executed without root / administrator rights, aborting...", false)
 		case StDeviceVulnerable:
 			showTrust(false)
 		case StDeviceTrusted:
