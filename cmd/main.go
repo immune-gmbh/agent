@@ -422,7 +422,9 @@ func run() int {
 		logrus.Warn("Can't check user. It is recommended to run as administrator or root user")
 		logrus.Debugf("util.IsRoot(): %s", err.Error())
 	} else if !root {
-		logrus.Info("It is recommended to run as administrator or root user for full functionality")
+		tui.SetUIState(tui.StNoRoot)
+		logrus.Error("This program must be run with elevated privileges")
+		return 1
 	}
 
 	var caCert *x509.Certificate
