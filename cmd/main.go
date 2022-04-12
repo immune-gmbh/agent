@@ -104,11 +104,6 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 	// XXX detect TPM here and handle no-access and not-found errors
 	//logrus.Warnf("Cannot find a hardware trust anchor. Fall back to software-only")
 
-	if err := initState(cli.StateDir, glob); err != nil {
-		logrus.Debugf("loadFreshState(cli.StateDir, glob): %s", err.Error())
-		logrus.Error("Cannot restore state")
-		return err
-	}
 	glob.State.TPM = enroll.TPM
 	a, err := tcg.OpenTPM(glob.State.TPM, glob.State.StubState)
 	if err != nil {
@@ -150,13 +145,6 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 
 func (attest *attestCmd) Run(glob *globalOptions) error {
 	ctx := context.Background()
-
-	// fetch/refresh configuration
-	if err := initState(cli.StateDir, glob); err != nil {
-		logrus.Debugf("loadFreshState(cli.StateDir, glob): %s", err.Error())
-		logrus.Error("Cannot restore state")
-		return err
-	}
 
 	if !glob.State.IsEnrolled() {
 		logrus.Errorf("No previous state found, please enroll first.")
@@ -217,12 +205,6 @@ func doAttest(glob *globalOptions, ctx context.Context) error {
 }
 
 func (report *reportCmd) Run(glob *globalOptions) error {
-	// fetch/refresh configuration
-	if err := initState(cli.StateDir, glob); err != nil {
-		logrus.Error("Cannot restore state")
-		return err
-	}
-
 	if glob.State == nil {
 		logrus.Errorf("No previous state found, please enroll first.")
 		return errors.New("no-state")
@@ -339,12 +321,7 @@ func run() int {
 	// tell who we are
 	logrus.Debug(desc)
 
-	// check for statedir after parsing opts, b/c opts can change it
-	if stateDir == "" {
-		logrus.Warnf("Cannot write to state directories %#v", state.DefaultStateDirs())
-		stateDir = os.TempDir()
-	}
-
+	// bail out if not root
 	root, err := util.IsRoot()
 	if err != nil {
 		logrus.Warn("Can't check user. It is recommended to run as administrator or root user")
@@ -355,23 +332,23 @@ func run() int {
 		return 1
 	}
 
-	var caCert *x509.Certificate
-	if cli.CA != "" {
-		buf, err := ioutil.ReadFile(cli.CA)
-		if err != nil {
-			logrus.Fatalf("Cannot read '%s': %s", cli.CA, err.Error())
-		}
-
-		if pem, _ := pem.Decode(buf); pem != nil {
-			buf = pem.Bytes
-		}
-
-		caCert, err = x509.ParseCertificate(buf)
-		if err != nil {
-			logrus.Fatalf("CA certificate ill-formed: %s", err.Error())
-		}
+	// check for statedir after parsing opts, b/c opts can change it
+	if stateDir == "" {
+		logrus.Warnf("Cannot write to state directories %#v", state.DefaultStateDirs())
+		stateDir = os.TempDir() // XXX
 	}
-	glob.Client = api.NewClient(cli.Server, caCert, releaseId)
+
+	if err := initClient(&glob); err != nil {
+		tui.DumpErr()
+		return 1
+	}
+
+	// fetch/refresh configuration
+	if err := initState(stateDir, &glob); err != nil {
+		logrus.Error("Cannot restore state")
+		tui.DumpErr()
+		return 1
+	}
 
 	// Run the selected subcommand
 	if err := ctx.Run(&glob); err != nil {
@@ -443,5 +420,29 @@ func initState(stateDir string, glob *globalOptions) error {
 		}
 	}
 
+	return nil
+}
+
+func initClient(glob *globalOptions) error {
+	var caCert *x509.Certificate
+	if cli.CA != "" {
+		buf, err := ioutil.ReadFile(cli.CA)
+		if err != nil {
+			logrus.Errorf("Cannot read '%s': %s", cli.CA, err.Error())
+			return err
+		}
+
+		if pem, _ := pem.Decode(buf); pem != nil {
+			buf = pem.Bytes
+		}
+
+		caCert, err = x509.ParseCertificate(buf)
+		if err != nil {
+			logrus.Errorf("CA certificate ill-formed: %s", err.Error())
+			return err
+		}
+	}
+
+	glob.Client = api.NewClient(cli.Server, caCert, releaseId)
 	return nil
 }
