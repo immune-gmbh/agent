@@ -44,7 +44,8 @@ var (
 
 type globalOptions struct {
 	// on-disk state
-	State *state.State
+	State     *state.State
+	StatePath string
 
 	// derived from cli opts
 	Client          api.Client
@@ -130,9 +131,9 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 		}
 	}
 
-	// XXX don't join paths on every occasion, provide file name globally
-	if err := glob.State.Store(path.Join(cli.StateDir, "keys")); err != nil {
-		logrus.Debugf("Store(%s): %s", cli.StateDir, err)
+	// save the new state to disk
+	if err := glob.State.Store(glob.StatePath); err != nil {
+		logrus.Debugf("Store(%s): %s", glob.StatePath, err)
 		logrus.Errorf("Failed to save activated keys to disk")
 		return err
 	}
@@ -292,25 +293,6 @@ func run() int {
 	// add info about build to description
 	desc := programDesc + " " + releaseId + " (" + runtime.GOARCH + ")"
 
-	// find a state dir we can access
-	var stateDir string
-	for _, s := range state.DefaultStateDirs() {
-		err := os.MkdirAll(s, os.ModeDir|0750)
-		if err != nil {
-			continue
-		}
-		path := filepath.Join(s, "testfile")
-		fd, err := os.Create(path)
-		if err != nil {
-			continue
-		}
-
-		fd.Close()
-		os.Remove(path)
-		stateDir = s
-		break
-	}
-
 	// Parse common cli options
 	ctx := kong.Parse(&cli,
 		kong.Name(programName),
@@ -322,7 +304,7 @@ func run() int {
 		}),
 		kong.Vars{
 			"tpm_default_path":   state.DefaultTPMDevice(),
-			"state_default_dir":  stateDir,
+			"state_default_dir":  state.DefaultStateDir(),
 			"server_default_url": "https://api.immu.ne/v2",
 		},
 		kong.Bind(&glob))
@@ -343,19 +325,13 @@ func run() int {
 		return 1
 	}
 
-	// check for statedir after parsing opts, b/c opts can change it
-	if stateDir == "" {
-		logrus.Warnf("Cannot write to state directories %#v", state.DefaultStateDirs())
-		stateDir = os.TempDir() // XXX
-	}
-
 	if err := initClient(&glob); err != nil {
 		tui.DumpErr()
 		return 1
 	}
 
 	// fetch/refresh configuration
-	if err := initState(stateDir, &glob); err != nil {
+	if err := initState(cli.StateDir, &glob); err != nil {
 		logrus.Error("Cannot restore state")
 		tui.DumpErr()
 		return 1
@@ -393,11 +369,33 @@ func initUI(forceColors bool, forceLog bool) {
 
 // load and migrate on-disk state
 func initState(stateDir string, glob *globalOptions) error {
-	// XXX fix this directory confusion once and for all; also see cli.StateDir...
-	statePath := path.Join(stateDir, "keys")
+	// stateDir is either the OS-specific default or what we get from the CLI
+	if stateDir == "" {
+		logrus.Error("No state directory specified")
+		return errors.New("state parameter empty")
+	}
+
+	// test if the state directory is writable
+	{
+		err := os.MkdirAll(stateDir, os.ModeDir|0750)
+		if err != nil {
+			logrus.Errorf("Can't create state directory, check permissions: %s", stateDir)
+			return err
+		}
+		tmp := filepath.Join(stateDir, "testfile")
+		fd, err := os.Create(tmp)
+		if err != nil {
+			logrus.Errorf("Can't write in state directory, check permissions: %s", stateDir)
+			return err
+		}
+		fd.Close()
+		os.Remove(tmp)
+	}
+
+	glob.StatePath = path.Join(stateDir, "keys")
 
 	// load and migrate state
-	st, update, err := state.LoadState(stateDir)
+	st, update, err := state.LoadState(glob.StatePath)
 	if errors.Is(err, state.ErrNotExist) {
 		logrus.Info("No previous state found")
 		glob.State = state.NewState()
@@ -411,8 +409,8 @@ func initState(stateDir string, glob *globalOptions) error {
 	}
 	if update {
 		logrus.Debugf("Migrating state file to newest version")
-		if err := glob.State.Store(statePath); err != nil {
-			logrus.Debugf("Store(%s): %s", cli.StateDir, err)
+		if err := glob.State.Store(glob.StatePath); err != nil {
+			logrus.Debugf("Store(%s): %s", glob.StatePath, err)
 			return err
 		}
 	}
@@ -425,8 +423,8 @@ func initState(stateDir string, glob *globalOptions) error {
 	}
 	if update {
 		logrus.Debugf("Storing new config from server")
-		if err := glob.State.Store(statePath); err != nil {
-			logrus.Debugf("Store(%s): %s", cli.StateDir, err)
+		if err := glob.State.Store(glob.StatePath); err != nil {
+			logrus.Debugf("Store(%s): %s", glob.StatePath, err)
 			return err
 		}
 	}

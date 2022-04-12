@@ -13,6 +13,6 @@ func DefaultTPMDevice() string {
 
 // DefaultStateDir returns all candidates for the config data dir in order of
 // writing.
-func DefaultStateDirs() []string {
-	return []string{filepath.Clean(filepath.Join(os.Getenv("ProgramData"), DefaultVendorSubdir))}
+func DefaultStateDir() string {
+	return filepath.Clean(filepath.Join(os.Getenv("ProgramData"), DefaultVendorSubdir))
 }
