@@ -107,12 +107,13 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 		glob.State.TPM = enroll.TPM
 	}
 
-	// XXX detect TPM here and handle no-access and not-found errors
-	//logrus.Warnf("Cannot find a hardware trust anchor. Fall back to software-only")
-
 	if err := openTPM(glob); err != nil {
+		if glob.State.TPM != state.DummyTPMIdentifier {
+			tui.SetUIState(tui.StSelectTAFailed)
+		}
 		return err
 	}
+	tui.SetUIState(tui.StSelectTASuccess)
 
 	if err := attestation.Enroll(ctx, &glob.Client, enroll.Token, glob.EndorsementAuth, defaultNameHint, glob.Anchor, glob.State); err != nil {
 		tui.SetUIState(tui.StEnrollFailed)
