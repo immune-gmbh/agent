@@ -56,10 +56,28 @@ func IsKernelModuleLoaded(name string) (bool, error) {
 	return false, errors.New("IsRoot not implemented on " + runtime.GOOS)
 }
 
-func IsRoot() (ret bool, err error) {
-	// this needs a more functional solution soon
-	ret = true
-	return
+func IsRoot() (bool, error) {
+	var sid *windows.SID
+
+	// see https://docs.microsoft.com/en-us/windows/desktop/api/securitybaseapi/nf-securitybaseapi-checktokenmembership
+	if err := windows.AllocateAndInitializeSid(
+		&windows.SECURITY_NT_AUTHORITY,
+		2,
+		windows.SECURITY_BUILTIN_DOMAIN_RID,
+		windows.DOMAIN_ALIAS_RID_ADMINS,
+		0, 0, 0, 0, 0, 0,
+		&sid); err != nil {
+		return false, fmt.Errorf("SID Error: %s", err)
+	}
+	defer windows.FreeSid(sid)
+
+	token := windows.Token(0)
+	member, err := token.IsMember(sid)
+	if err != nil {
+		return false, fmt.Errorf("token error: %s", err)
+	}
+
+	return member, nil
 }
 
 func StartDriverIfNotRunning(driverName string) error {
