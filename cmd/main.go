@@ -334,6 +334,7 @@ func initState(stateDir string, glob *globalOptions) error {
 		logrus.Error("Cannot read state, no permissions")
 		return err
 	} else if err != nil {
+		logrus.Debugf("state.LoadState(%s): %s", glob.StatePath, err)
 		return err
 	} else {
 		glob.State = st
