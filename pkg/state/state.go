@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
@@ -41,9 +40,8 @@ func (s *State) EnsureFresh(cl *api.Client) (bool, error) {
 }
 
 // LoadState returns a loaded state and a bool if it has been updated or error
-func LoadState(dir string) (*State, bool, error) {
+func LoadState(keysPath string) (*State, bool, error) {
 	logrus.Traceln("load on-disk state")
-	keysPath := path.Join(dir, "keys")
 	if _, err := os.Stat(keysPath); os.IsNotExist(err) {
 		return nil, false, ErrNotExist
 	} else if os.IsPermission(err) {
