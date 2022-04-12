@@ -6,9 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"strconv"
 
 	"github.com/google/go-tpm/tpm2"
@@ -23,7 +23,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 )
 
-func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State, dumpEvidence bool) (*api.Appraisal, string, error) {
+func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State, releaseId string, dumpEvidenceTo string, dryRun bool) (*api.Appraisal, string, error) {
 	var conn io.ReadWriteCloser
 	if anch, ok := anchor.(*tcg.TCGAnchor); ok {
 		conn = anch.Conn
@@ -37,6 +37,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 		log.Warnf("Failed to gather firmware state")
 		fwProps = api.FirmwareProperties{}
 	}
+	fwProps.Agent.Release = releaseId
 
 	// transform firmware info into json and crypto-safe canonical json representations
 	fwPropsJSON, err := json.Marshal(fwProps)
@@ -153,16 +154,18 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 		logrus.Fatalf("Internal error while encoding firmware state. This is a bug, please report it to bugs@immu.ne.")
 	}
 
-	if dumpEvidence {
-		host, err := os.Hostname()
-		if err != nil {
-			return nil, "", err
-		}
-		path := host + ".evidence.json"
+	if dumpEvidenceTo == "-" {
+		fmt.Println(string(evidenceJSON))
+	} else if dumpEvidenceTo != "" {
+		path := dumpEvidenceTo + ".evidence.json"
 		if err := ioutil.WriteFile(path, evidenceJSON, 0644); err != nil {
 			return nil, "", err
 		}
 		logrus.Infof("Dumped evidence json: %s", path)
+	}
+
+	if dryRun {
+		return nil, "", nil
 	}
 
 	// API call

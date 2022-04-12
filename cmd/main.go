@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"fmt"
-	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -20,10 +18,8 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
 
-	"github.com/google/go-tpm/tpm2"
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/attestation"
-	"github.com/immune-gmbh/agent/v3/pkg/firmware"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
@@ -74,12 +70,11 @@ type rootCmd struct {
 	CA       string      `name:"server-ca" help:"immune SaaS API CA (PEM encoded)" optional type:"path"`
 	StateDir string      `name:"state-dir" default:"${state_default_dir}" help:"Directory holding the cli state" type:"path"`
 	LogFlag  bool        `name:"log" help:"Force log output on and text UI off"`
-	Verbose  verboseFlag `help:"Enable verbose mode. Implies --log"`
+	Verbose  verboseFlag `help:"Enable verbose mode, implies --log"`
 	Trace    traceFlag   `hidden`
 	Colors   bool        `help:"Force colors on for all console outputs (default: autodetect)"`
 
 	// Subcommands
-	Report reportCmd `cmd:"" help:"Generates a platform report"`
 	Attest attestCmd `cmd:"" help:"Attests platform integrity of device"`
 	Enroll enrollCmd `cmd:"" help:"Enrolls device at the immune SaaS backend"`
 }
@@ -89,15 +84,12 @@ type enrollCmd struct {
 	Token    string `arg:"" required:"" name:"token" help:"Enrollment authentication token"`
 	Name     string `arg:"" optional:"" name:"name hint" help:"Name to assign to the device. May get suffixed by a counter if already taken. Defaults to the hostname."`
 	TPM      string `name:"tpm" default:"${tpm_default_path}" help:"TPM device: device path (${tpm_default_path}) or mssim, sgx, swtpm/net url (mssim://localhost, sgx://localhost, net://localhost:1234) or 'dummy' for dummy TPM"`
-	DummyTPM bool   `name:notpm help:"Force using insecure dummy TPM if this device has no real TPM"`
+	DummyTPM bool   `name:"notpm" help:"Force using insecure dummy TPM if this device has no real TPM" default:"false"`
 }
 
 type attestCmd struct {
-}
-
-type reportCmd struct {
-	Show bool   `help:"Show output instead of writing it to file" default:"false"`
-	Out  string `arg:"" optional:"" name:"out" default:"." help:"Absolute directory path to newly generated report" type:"path"`
+	DryRun bool   `name:"dry-run" help:"Do full attest but don't contact the immune servers" default:"false"`
+	Dump   string `optional:"" name:"dump-report" help:"Specify a file to dump the security report to" type:"path"`
 }
 
 func (enroll *enrollCmd) Run(glob *globalOptions) error {
@@ -145,7 +137,7 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 		return nil
 	}
 
-	return doAttest(glob, ctx)
+	return doAttest(glob, ctx, "", false)
 }
 
 func (attest *attestCmd) Run(glob *globalOptions) error {
@@ -160,17 +152,21 @@ func (attest *attestCmd) Run(glob *globalOptions) error {
 		return err
 	}
 
-	return doAttest(glob, ctx)
+	return doAttest(glob, ctx, attest.Dump, attest.DryRun)
 }
 
-func doAttest(glob *globalOptions, ctx context.Context) error {
-	appraisal, webLink, err := attestation.Attest(ctx, &glob.Client, glob.EndorsementAuth, glob.Anchor, glob.State, false)
+func doAttest(glob *globalOptions, ctx context.Context, dumpReportTo string, dryRun bool) error {
+	appraisal, webLink, err := attestation.Attest(ctx, &glob.Client, glob.EndorsementAuth, glob.Anchor, glob.State, releaseId, dumpReportTo, dryRun)
 	if err != nil {
 		tui.SetUIState(tui.StAttestationFailed)
 		return err
 	}
 	tui.SetUIState(tui.StAttestationSuccess)
 	logrus.Infof("Attestation successful")
+
+	if dryRun {
+		return nil
+	}
 
 	if appraisal.Verdict.Result {
 		tui.SetUIState(tui.StDeviceTrusted)
@@ -199,71 +195,6 @@ func doAttest(glob *globalOptions, ctx context.Context) error {
 
 	if appraisal, err := json.MarshalIndent(*appraisal, "", "  "); err == nil {
 		logrus.Debugln(string(appraisal))
-	}
-
-	return nil
-}
-
-func (report *reportCmd) Run(glob *globalOptions) error {
-	if glob.State == nil {
-		logrus.Errorf("No previous state found, please enroll first.")
-		return errors.New("no-state")
-	}
-
-	// collect firmware info
-	a, err := tcg.OpenTPM(glob.State.TPM, glob.State.StubState)
-	if err != nil {
-		logrus.Debugf("openAndClearTPM(cli.TPM, glob): %s", err.Error())
-		logrus.Warnf("Cannot open TPM: %s", glob.State.TPM)
-	}
-	glob.Anchor = a
-	var conn io.ReadWriteCloser
-	if anch, ok := glob.Anchor.(*tcg.TCGAnchor); ok {
-		conn = anch.Conn
-	}
-	fwProps, err := firmware.GatherFirmwareData(conn, &glob.State.Config)
-	if err != nil {
-		logrus.Warnf("Failed to gather firmware state")
-		fwProps = api.FirmwareProperties{}
-	}
-	fwProps.Agent.Release = releaseId
-
-	// read PCRs
-	pcrValues, err := glob.Anchor.PCRValues(tpm2.Algorithm(glob.State.Config.PCRBank), glob.State.Config.PCRs)
-	if err != nil {
-		logrus.Debugf("tcg.PCRValues(glob.TpmConn, pcrSel): %s", err.Error())
-		logrus.Error("Failed read all PCR values")
-		return err
-	}
-
-	// serialize
-	evidence := api.Evidence{
-		Type:     api.EvidenceType,
-		PCRs:     pcrValues,
-		Firmware: fwProps,
-	}
-	evidenceJSON, err := json.Marshal(evidence)
-	if err != nil {
-		logrus.Debugf("json.Marshal(Evidence): %s", err.Error())
-		logrus.Fatalf("Internal error while encoding firmware state. This is a bug, please report it to bugs@immu.ne.")
-	}
-
-	if !report.Show {
-		abs, err := filepath.Abs(report.Out)
-		if err != nil {
-			return err
-		}
-		host, err := os.Hostname()
-		if err != nil {
-			return err
-		}
-		path := abs + "/" + host + ".json"
-		if err := ioutil.WriteFile(path, evidenceJSON, 0644); err != nil {
-			return err
-		}
-		logrus.Infof("Report created: %s", path)
-	} else {
-		fmt.Println(string(evidenceJSON))
 	}
 
 	return nil
