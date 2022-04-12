@@ -43,6 +43,6 @@ func IsKernelModuleLoaded(name string) (bool, error) {
 
 func IsRoot() (ret bool, err error) {
 	currentUser, err := user.Current()
-	ret = currentUser.Username == "root"
+	ret = currentUser.Uid == "0"
 	return
 }
