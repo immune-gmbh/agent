@@ -84,10 +84,11 @@ type rootCmd struct {
 }
 
 type enrollCmd struct {
-	NoAttest bool   `help:"Don't attest after successful enrollment." default:"false"`
+	NoAttest bool   `help:"Don't attest after successful enrollment" default:"false"`
 	Token    string `arg:"" required:"" name:"token" help:"Enrollment authentication token"`
 	Name     string `arg:"" optional:"" name:"name hint" help:"Name to assign to the device. May get suffixed by a counter if already taken. Defaults to the hostname."`
 	TPM      string `name:"tpm" default:"${tpm_default_path}" help:"TPM device: device path (${tpm_default_path}) or mssim, sgx, swtpm/net url (mssim://localhost, sgx://localhost, net://localhost:1234) or 'dummy' for dummy TPM"`
+	DummyTPM bool   `name:notpm help:"Force using insecure dummy TPM if this device has no real TPM"`
 }
 
 type attestCmd struct {
@@ -100,24 +101,25 @@ type reportCmd struct {
 
 func (enroll *enrollCmd) Run(glob *globalOptions) error {
 	ctx := context.Background()
+	if enroll.DummyTPM {
+		glob.State.TPM = state.DummyTPMIdentifier
+	} else {
+		glob.State.TPM = enroll.TPM
+	}
 
 	// XXX detect TPM here and handle no-access and not-found errors
 	//logrus.Warnf("Cannot find a hardware trust anchor. Fall back to software-only")
 
-	glob.State.TPM = enroll.TPM
-	a, err := tcg.OpenTPM(glob.State.TPM, glob.State.StubState)
-	if err != nil {
-		logrus.Debugf("openAndClearTPM(cli.TPM, glob): %s", err.Error())
-		logrus.Errorf("Cannot open TPM: %s", glob.State.TPM)
+	if err := openTPM(glob); err != nil {
 		return err
 	}
-	glob.Anchor = a
 
 	if err := attestation.Enroll(ctx, &glob.Client, enroll.Token, glob.EndorsementAuth, defaultNameHint, glob.Anchor, glob.State); err != nil {
 		tui.SetUIState(tui.StEnrollFailed)
 		return err
 	}
 
+	// incorporate dummy TPM state
 	if stub, ok := glob.Anchor.(*tcg.SoftwareAnchor); ok {
 		if st, err := stub.Store(); err != nil {
 			logrus.Debugf("SoftwareAnchor.Store: %s", err)
@@ -127,6 +129,7 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 		}
 	}
 
+	// XXX don't join paths on every occasion, provide file name globally
 	if err := glob.State.Store(path.Join(cli.StateDir, "keys")); err != nil {
 		logrus.Debugf("Store(%s): %s", cli.StateDir, err)
 		logrus.Errorf("Failed to save activated keys to disk")
@@ -151,14 +154,9 @@ func (attest *attestCmd) Run(glob *globalOptions) error {
 		return errors.New("no-state")
 	}
 
-	// open TPM connection
-	a, err := tcg.OpenTPM(glob.State.TPM, glob.State.StubState)
-	if err != nil {
-		logrus.Debugf("openAndClearTPM(cli.TPM, glob): %s", err.Error())
-		logrus.Errorf("Cannot open TPM: %s", glob.State.TPM)
+	if err := openTPM(glob); err != nil {
 		return err
 	}
-	glob.Anchor = a
 
 	return doAttest(glob, ctx)
 }
@@ -266,6 +264,18 @@ func (report *reportCmd) Run(glob *globalOptions) error {
 		fmt.Println(string(evidenceJSON))
 	}
 
+	return nil
+}
+
+func openTPM(glob *globalOptions) error {
+	a, err := tcg.OpenTPM(glob.State.TPM, glob.State.StubState)
+	if err != nil {
+		logrus.Debugf("tcg.OpenTPM(glob.State.TPM, glob.State.StubState): %s", err.Error())
+		logrus.Errorf("Cannot open TPM: %s", glob.State.TPM)
+		return err
+	}
+
+	glob.Anchor = a
 	return nil
 }
 
