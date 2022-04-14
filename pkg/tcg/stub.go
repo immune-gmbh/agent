@@ -11,9 +11,12 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
+	"time"
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpmutil"
@@ -69,6 +72,7 @@ func (*SoftwareHandle) Flush(TrustAnchor) {
 
 const (
 	SoftwareAnchorStateType = "software-anchor/1"
+	stubIdentifier          = "immune GmbH " + SoftwareAnchorStateType
 )
 
 type SoftwareAnchor struct {
@@ -221,7 +225,47 @@ func (s *SoftwareAnchor) AllPCRValues() (map[string]map[string]api.Buffer, error
 }
 
 func (s *SoftwareAnchor) ReadEKCertificate() (*x509.Certificate, error) {
-	return nil, errors.New("no ek")
+	emptyCert := &x509.Certificate{}
+	var sigAlg x509.SignatureAlgorithm
+
+	switch s.endorsementKey.public.Type {
+	case tpm2.AlgECC:
+		sigAlg = x509.ECDSAWithSHA256
+	case tpm2.AlgRSA:
+		sigAlg = x509.SHA256WithRSAPSS
+	default:
+		return emptyCert, ErrInvalid
+	}
+
+	tmpl := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: stubIdentifier,
+		},
+		NotBefore: time.Now().Add(-10 * 60 * time.Second),
+
+		SignatureAlgorithm:    sigAlg,
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		IsCA:                  false,
+	}
+
+	pub, err := (*tpm2.Public)(s.endorsementKey.public).Key()
+	if err != nil {
+		return emptyCert, err
+	}
+
+	der, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, pub, s.endorsementKey.private)
+	if err != nil {
+		return emptyCert, err
+	}
+
+	ref, err := x509.ParseCertificate(der)
+	if err != nil {
+		return emptyCert, err
+	}
+
+	return ref, nil
 }
 
 func (s *SoftwareAnchor) GetEndorsementKey() (Handle, tpm2.Public, error) {
