@@ -3,6 +3,8 @@
 
 package state
 
+import "path/filepath"
+
 // Defaults for Linux and MacOS
 const (
 	// gloablProgramStateDir stores programatically generated state
@@ -15,5 +17,5 @@ func DefaultTPMDevice() string {
 }
 
 func DefaultStateDir() string {
-	return globalProgramStateDir
+	return filepath.Clean(filepath.Join(globalProgramStateDir, DefaultVendorSubdir))
 }
