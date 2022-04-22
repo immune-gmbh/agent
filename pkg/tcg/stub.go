@@ -70,10 +70,9 @@ func (*SoftwareHandle) Flush(TrustAnchor) {
 	return
 }
 
-const (
-	SoftwareAnchorStateType = "software-anchor/1"
-	stubIdentifier          = "immune GmbH " + SoftwareAnchorStateType
-)
+const SoftwareAnchorStateType = "software-anchor/1"
+
+var StubIdentifier = "immune GmbH " + SoftwareAnchorStateType
 
 type SoftwareAnchor struct {
 	rootKey        crypto.PrivateKey
@@ -240,7 +239,7 @@ func (s *SoftwareAnchor) ReadEKCertificate() (*x509.Certificate, error) {
 	tmpl := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
-			CommonName: stubIdentifier,
+			CommonName: StubIdentifier,
 		},
 		NotBefore: time.Now().Add(-10 * 60 * time.Second),
 
