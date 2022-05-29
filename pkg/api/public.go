@@ -66,7 +66,15 @@ type FirmwareProperties struct {
 	NICs            *NICList           `json:"nic,omitempty"`
 	Memory          Memory             `json:"memory"`
 	Agent           *Agent             `json:"agent,omitempty"`
+	Devices         *Devices           `json:"devices,omitempty"`
 }
+
+type Devices struct {
+	FWUPdVersion string        `json:"fwupd_version"`
+	Topology     []FWUPdDevice `json:"topology"`
+}
+
+type FWUPdDevice = map[string]interface{}
 
 type Agent struct {
 	Release   string      `json:"release"`
