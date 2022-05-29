@@ -18,6 +18,7 @@ require (
 	github.com/digitalocean/go-smbios v0.0.0-20180907143718-390a4f403a8e
 	github.com/fatih/color v1.13.0
 	github.com/fearful-symmetry/gomsr v0.0.1
+	github.com/godbus/dbus/v5 v5.0.4
 	github.com/google/go-licenses v1.0.0
 	github.com/google/go-tpm v0.3.3
 	github.com/google/go-tpm-tools v0.3.4

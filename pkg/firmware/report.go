@@ -12,6 +12,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/biosflash"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/cpuid"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware/fwupd"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/heci"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/msr"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/netif"
@@ -125,6 +126,13 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 
 	// System memory map
 	fwData.Memory.Error = api.NotImplemented
+
+	// FWUPd version and device list
+	fwData.Devices = new(api.Devices)
+	err = fwupd.ReportFWUPD(fwData.Devices)
+	if err != nil {
+		fwData.Devices = nil
+	}
 
 	logrus.Traceln("done gathering report data")
 	return fwData, nil
