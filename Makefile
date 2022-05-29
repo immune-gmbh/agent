@@ -7,7 +7,7 @@ GOLIC="$(GOBINDIR)/go-licenses"
 
 # build artifacts, sources
 SRCS-CLIENT:=cmd/main.go 
-DEPS-CLIENT:=$(SRCS-CLIENT) pkg/**/*.go
+DEPS-CLIENT:=$(SRCS-CLIENT) $(wildcard pkg/firmware/*/*.go) $(wildcard pkg/*/*.go)
 
 # build-time parameters, values
 RELEASE_ID?=$(shell git describe --tags)
