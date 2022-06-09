@@ -168,22 +168,22 @@ func doAttest(glob *globalOptions, ctx context.Context, dumpReportTo string, dry
 		return nil
 	}
 
-	if appraisal.Verdict.Result {
+	if appraisal.Verdict.Result == api.Trusted {
 		tui.SetUIState(tui.StDeviceTrusted)
 		tui.SetUIState(tui.StChainAllGood)
 	} else {
 		tui.SetUIState(tui.StDeviceVulnerable)
-		if !appraisal.Verdict.SupplyChain {
+		if appraisal.Verdict.SupplyChain == api.Vulnerable {
 			tui.SetUIState(tui.StChainFailSupplyChain)
-		} else if !appraisal.Verdict.Configuration {
+		} else if appraisal.Verdict.Configuration == api.Vulnerable {
 			tui.SetUIState(tui.StChainFailConfiguration)
-		} else if !appraisal.Verdict.Firmware {
+		} else if appraisal.Verdict.Firmware == api.Vulnerable {
 			tui.SetUIState(tui.StChainFailFirmware)
-		} else if !appraisal.Verdict.Bootloader {
+		} else if appraisal.Verdict.Bootloader == api.Vulnerable {
 			tui.SetUIState(tui.StChainFailBootloader)
-		} else if !appraisal.Verdict.OperatingSystem {
+		} else if appraisal.Verdict.OperatingSystem == api.Vulnerable {
 			tui.SetUIState(tui.StChainFailOperatingSystem)
-		} else if !appraisal.Verdict.EndpointProtection {
+		} else if appraisal.Verdict.EndpointProtection == api.Vulnerable {
 			tui.SetUIState(tui.StChainFailEndpointProtection)
 		}
 	}
