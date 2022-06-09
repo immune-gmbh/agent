@@ -233,20 +233,25 @@ type Appraisal struct {
 	Policy    *Policy   `jsonapi:"relation,policy" json:"policy"`
 }
 
-const VerdictType = "verdict/1"
+const VerdictType = "verdict/3"
+
+const (
+	Unsupported = "unsupported"
+	Trusted     = "trusted"
+	Vulnerable  = "vulnerable"
+)
 
 // /v2/devices (apisrv)
 type Verdict struct {
-	Type               string `json:"type"`
-	Result             bool   `json:"result"`
-	SupplyChain        bool   `json:"supply_chain"`
-	Configuration      bool   `json:"configuration"`
-	Firmware           bool   `json:"firmware"`
-	Bootloader         bool   `json:"bootloader"`
-	OperatingSystem    bool   `json:"operating_system"`
-	EndpointProtection bool   `json:"endpoint_protection"`
+	Type string `json:"type"`
 
-	Bootchain bool `json:"bootchain"` // deprecated
+	Result             string `json:"result"`
+	SupplyChain        string `json:"supply_chain"`
+	Configuration      string `json:"configuration"`
+	Firmware           string `json:"firmware"`
+	Bootloader         string `json:"bootloader"`
+	OperatingSystem    string `json:"operating_system"`
+	EndpointProtection string `json:"endpoint_protection"`
 }
 
 const ReportType = "report/2"
