@@ -130,6 +130,11 @@ func (c *Client) Attest(ctx context.Context, quoteCredential string, ev Evidence
 		return nil, "", err
 	}
 
+	// attestation in progress
+	if payload == nil {
+		return nil, "", nil
+	}
+
 	one, ok := payload.(*jsonapi.OnePayload)
 	if !ok || one.Data == nil {
 		return nil, "", FormatError
@@ -190,11 +195,6 @@ func (c *Client) Post(ctx context.Context, route string, doc interface{}) (jsona
 		ctx, cancel := context.WithTimeout(ctx, c.PostRequestTimeout)
 		defer cancel()
 		ev, err = c.doPost(ctx, route, doc)
-
-		// our post requests don't use if-modified-since headers and thus do not allow empty bodies
-		if ev == nil && err == nil {
-			return nil, FormatError
-		}
 
 		if err == nil || errors.Is(err, FormatError) || errors.Is(err, AuthError) {
 			return ev, err
@@ -291,17 +291,20 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 	debugging := logrus.GetLevel() == logrus.TraceLevel
 
 	switch {
-	case code == 304:
+	case code == http.StatusAccepted:
+		retErr = nil
+		readBody = false
+	case code == http.StatusNotModified:
 		// server tells us to use cached response and sends no body
 		retErr = nil
 		readBody = false
 	case code <= 400:
 		retErr = nil
 		readBody = true
-	case code == 401:
+	case code == http.StatusUnauthorized:
 		retErr = AuthError
 		readBody = debugging
-	case code == 402:
+	case code == http.StatusPaymentRequired:
 		retErr = PaymentError
 		readBody = debugging
 	case code < 500:
