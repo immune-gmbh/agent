@@ -130,7 +130,7 @@ func (c *Client) Attest(ctx context.Context, quoteCredential string, ev Evidence
 		return nil, "", err
 	}
 
-	// attestation in progress
+	// attestation in progress w/o result
 	if payload == nil {
 		return nil, "", nil
 	}
@@ -139,12 +139,17 @@ func (c *Client) Attest(ctx context.Context, quoteCredential string, ev Evidence
 	if !ok || one.Data == nil {
 		return nil, "", FormatError
 	}
-	buf, err := json.Marshal(one.Data.Attributes)
-	if err != nil {
-		return nil, "", err
-	}
+
+	// we might get a device type back which contains a self-web link but then we don't want to unmarshal it
 	var appr Appraisal
-	err = json.Unmarshal(buf, &appr)
+	var buf []byte
+	if one.Data.Type == "appraisals" {
+		buf, err = json.Marshal(one.Data.Attributes)
+		if err != nil {
+			return nil, "", err
+		}
+		err = json.Unmarshal(buf, &appr)
+	}
 
 	var webLink string
 	if one.Data.Links != nil {
@@ -291,14 +296,14 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 	debugging := logrus.GetLevel() == logrus.TraceLevel
 
 	switch {
-	// request is processed without response body
-	case code == http.StatusAccepted:
-		fallthrough
-
 	// server tells us to use cached response and sends no body
 	case code == http.StatusNotModified:
 		retErr = nil
 		readBody = false
+
+	// request is processed
+	case code == http.StatusAccepted:
+		fallthrough
 
 	// default is to read a body for good status codes
 	case code < 400:
