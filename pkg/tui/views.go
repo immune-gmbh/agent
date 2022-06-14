@@ -53,7 +53,7 @@ func showTrust(trusted bool) {
 	if trusted {
 		status = SuccessStyle("TRUSTED")
 	} else {
-		status = FailureStyle("VULNERABLE")
+		status = FailureStyle("UNTRUSTED")
 	}
 	printf("\n >> This device is %s <<\n", status)
 }
