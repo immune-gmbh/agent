@@ -167,6 +167,10 @@ func doAttest(glob *globalOptions, ctx context.Context, dumpReportTo string, dry
 	if inProgress {
 		tui.SetUIState(tui.StAttestationRunning)
 		logrus.Infof("Attestation in progress, results become available later")
+		tui.ShowAppraisalLink(webLink)
+		if webLink != "" {
+			logrus.Infof("See detailed results here: %s", webLink)
+		}
 		return nil
 	} else {
 		tui.SetUIState(tui.StAttestationSuccess)
