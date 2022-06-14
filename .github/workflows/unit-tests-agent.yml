@@ -12,6 +12,7 @@ jobs:
     env:
       OS: ${{ matrix.sys.os }}
       CGO_LDFLAGS: ${{ matrix.sys.cgo_ldlags }}
+      
     defaults:
       run:
         shell: ${{ matrix.sys.shell }}
@@ -30,16 +31,6 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: "1.17"
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-            ~/Library/Caches/go-build
-            %LocalAppData%\go-build
-          key: ${{ runner.os }}-agent-${{ hashFiles('go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-agent-
       - name: Set up CGO environment for windows
         if: ${{ runner.os == 'Windows' }}
         uses: msys2/setup-msys2@v2
@@ -47,6 +38,18 @@ jobs:
           release: false
           path-type: inherit
           install: gcc openssl-devel gcc-libs
+      - id: go-cache-paths
+        run: |
+          echo "::set-output name=go-build::$(go env GOCACHE)"
+          echo "::set-output name=go-mod::$(go env GOMODCACHE)"
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ${{ steps.go-cache-paths.outputs.go-build }}
+            ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-agent-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-agent-
       - name: Build apps and test suite
         run: |
           make ${{ runner.os }}
