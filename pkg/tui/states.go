@@ -9,6 +9,7 @@ const (
 	StQuotePCR
 	StSendEvidence
 	StAttestationSuccess
+	StAttestationRunning
 	StAttestationFailed
 	StSelectTASuccess
 	StSelectTAFailed
@@ -42,6 +43,8 @@ func SetUIState(state UIState) {
 			showSpinner("Send report to immune Guard cloud")
 		case StAttestationSuccess:
 			showStepDone("Attestation successful", true)
+		case StAttestationRunning:
+			showStepDone("Attestation still in progress, results will be online soon", true)
 		case StAttestationFailed:
 			showStepDone("Attestation failed", false)
 		case StSelectTASuccess:
