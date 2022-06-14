@@ -141,14 +141,15 @@ func (c *Client) Attest(ctx context.Context, quoteCredential string, ev Evidence
 	}
 
 	// we might get a device type back which contains a self-web link but then we don't want to unmarshal it
-	var appr Appraisal
+	var appr *Appraisal
 	var buf []byte
 	if one.Data.Type == "appraisals" {
 		buf, err = json.Marshal(one.Data.Attributes)
 		if err != nil {
 			return nil, "", err
 		}
-		err = json.Unmarshal(buf, &appr)
+		appr = &Appraisal{}
+		err = json.Unmarshal(buf, appr)
 	}
 
 	var webLink string
@@ -158,7 +159,7 @@ func (c *Client) Attest(ctx context.Context, quoteCredential string, ev Evidence
 		}
 	}
 
-	return &appr, webLink, err
+	return appr, webLink, err
 }
 
 // Client.Configuration returns a nil Configuration when lastUpdate is not nil and the server tells us to use a cached configuration
