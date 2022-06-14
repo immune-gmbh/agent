@@ -161,8 +161,17 @@ func doAttest(glob *globalOptions, ctx context.Context, dumpReportTo string, dry
 		tui.SetUIState(tui.StAttestationFailed)
 		return err
 	}
-	tui.SetUIState(tui.StAttestationSuccess)
-	logrus.Infof("Attestation successful")
+
+	inProgress := appraisal == nil
+
+	if inProgress {
+		tui.SetUIState(tui.StAttestationRunning)
+		logrus.Infof("Attestation in progress, results become available later")
+		return nil
+	} else {
+		tui.SetUIState(tui.StAttestationSuccess)
+		logrus.Infof("Attestation successful")
+	}
 
 	if dryRun {
 		return nil

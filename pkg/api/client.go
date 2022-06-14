@@ -291,28 +291,36 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 	debugging := logrus.GetLevel() == logrus.TraceLevel
 
 	switch {
+	// request is processed without response body
 	case code == http.StatusAccepted:
-		retErr = nil
-		readBody = false
+		fallthrough
+
+	// server tells us to use cached response and sends no body
 	case code == http.StatusNotModified:
-		// server tells us to use cached response and sends no body
 		retErr = nil
 		readBody = false
-	case code <= 400:
+
+	// default is to read a body for good status codes
+	case code < 400:
 		retErr = nil
 		readBody = true
+
 	case code == http.StatusUnauthorized:
 		retErr = AuthError
 		readBody = debugging
+
 	case code == http.StatusPaymentRequired:
 		retErr = PaymentError
 		readBody = debugging
+
 	case code < 500:
 		retErr = FormatError
 		readBody = debugging
+
 	case code < 600:
 		retErr = ServerError
 		readBody = debugging
+
 	default:
 		retErr = fmt.Errorf("unexpected HTTP status code: %d", code)
 		readBody = false
