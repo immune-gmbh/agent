@@ -190,6 +190,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 		return nil, "", err
 	} else if err != nil {
 		log.Error("Attestation failed. An unknown error occured. Please try again later.")
+		logrus.Debugf("client.Attest(..): %s", err.Error())
 		return nil, "", err
 	}
 	return attestResp, webLink, nil
