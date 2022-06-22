@@ -1,8 +1,8 @@
 package state
 
 import (
-	"context"
 	"encoding/json"
+	"net/url"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -31,6 +31,7 @@ type StubState struct {
 type StateV3 struct {
 	Ty string `json:"type"`
 
+	// stub TPM
 	StubSeed  api.Buffer `json:"stub-seed,omitempty"`  // v3.1 (deprecated)
 	StubState *StubState `json:"stub-state,omitempty"` // v3.2
 
@@ -39,33 +40,12 @@ type StateV3 struct {
 	Root                   RootKeyV3              `json:"root"`
 	EndorsementKey         api.PublicKey          `json:"ek"`
 	EndorsementCertificate *api.Certificate       `json:"ek-certificate"`
-	TPM                    string                 `json:"tpm,omitempty"` // v3.3
+	TPM                    string                 `json:"tpm,omitempty"`       // v3.3
+	ServerURL              *url.URL               `json:"serverurl,omitempty"` // v3.4
 
 	// /v2/configuration
 	LastUpdate time.Time         `json:"last_update,string"`
 	Config     api.Configuration `json:"config"`
-}
-
-// returns true if a new config was fetched
-func (s *StateV3) EnsureFresh(cl *api.Client) (bool, error) {
-	ctx := context.Background()
-	now := time.Now()
-
-	cfg, err := cl.Configuration(ctx, &s.LastUpdate)
-	if err != nil {
-		return false, err
-	}
-
-	// if cfg is nil then there is no new config and we should use a cached version
-	if cfg != nil {
-		s.Config = *cfg
-		update := s.LastUpdate != time.Time{}
-		s.LastUpdate = now
-
-		return update, nil
-	}
-
-	return false, nil
 }
 
 func (s *StateV3) IsEnrolled() bool {

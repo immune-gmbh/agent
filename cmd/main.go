@@ -277,14 +277,20 @@ func run() int {
 		return 1
 	}
 
+	// load on-disk state
+	if err := initState(cli.StateDir, &glob); err != nil {
+		logrus.Error("Cannot restore state")
+		tui.DumpErr()
+		return 1
+	}
+
 	if err := initClient(&glob); err != nil {
 		tui.DumpErr()
 		return 1
 	}
 
-	// fetch/refresh configuration
-	if err := initState(cli.StateDir, &glob); err != nil {
-		logrus.Error("Cannot restore state")
+	// be sure to run this after we have a client
+	if err := updateConfig(&glob); err != nil {
 		tui.DumpErr()
 		return 1
 	}
@@ -296,6 +302,26 @@ func run() int {
 	} else {
 		return 0
 	}
+}
+
+// try to get a new configuration from server
+func updateConfig(glob *globalOptions) error {
+	update, err := glob.State.EnsureFresh(&glob.Client)
+	if err != nil {
+		logrus.Debugf("Fetching fresh config: %s", err)
+		return err
+	}
+
+	// store it on-disk
+	if update {
+		logrus.Debugf("Storing new config from server")
+		if err := glob.State.Store(glob.StatePath); err != nil {
+			logrus.Debugf("Store(%s): %s", glob.StatePath, err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func initUI(forceColors bool, forceLog bool) {
@@ -362,20 +388,6 @@ func initState(stateDir string, glob *globalOptions) error {
 	}
 	if update {
 		logrus.Debugf("Migrating state file to newest version")
-		if err := glob.State.Store(glob.StatePath); err != nil {
-			logrus.Debugf("Store(%s): %s", glob.StatePath, err)
-			return err
-		}
-	}
-
-	// see if the server has a new config for us
-	update, err = glob.State.EnsureFresh(&glob.Client)
-	if err != nil {
-		logrus.Debugf("Fetching fresh config: %s", err)
-		return err
-	}
-	if update {
-		logrus.Debugf("Storing new config from server")
 		if err := glob.State.Store(glob.StatePath); err != nil {
 			logrus.Debugf("Store(%s): %s", glob.StatePath, err)
 			return err

@@ -1,14 +1,15 @@
 package state
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 )
@@ -35,8 +36,31 @@ var (
 type State StateV3
 type DeviceKey DeviceKeyV3
 
+// returns true if a new config was fetched
+// this is not really a responsibility of the state at all, however it'll
+// remain here for the time being. just don't make this depend on specific
+// state versions, as the config structure is from the public API and thus
+// has its own versioning and there should be separate code handling
+// different API versions.
 func (s *State) EnsureFresh(cl *api.Client) (bool, error) {
-	return (*StateV3)(s).EnsureFresh(cl)
+	ctx := context.Background()
+	now := time.Now()
+
+	cfg, err := cl.Configuration(ctx, &s.LastUpdate)
+	if err != nil {
+		return false, err
+	}
+
+	// if cfg is nil then there is no new config and we should use a cached version
+	if cfg != nil {
+		s.Config = *cfg
+		update := s.LastUpdate != time.Time{}
+		s.LastUpdate = now
+
+		return update, nil
+	}
+
+	return false, nil
 }
 
 // LoadState returns a loaded state and a bool if it has been updated or error
@@ -78,7 +102,7 @@ func migrateState(raw []byte) (*State, bool, error) {
 	var dict map[string]interface{}
 
 	if err := json.Unmarshal(raw, &dict); err != nil {
-		log.Debugf("State file is not a JSON dict: %s", err)
+		logrus.Debugf("State file is not a JSON dict: %s", err)
 		return nil, false, ErrInvalid
 	}
 
@@ -86,7 +110,7 @@ func migrateState(raw []byte) (*State, bool, error) {
 		if str, ok := val.(string); ok {
 			switch str {
 			case ClientStateTypeV2:
-				log.Debugf("Migrating state from v2 to v3")
+				logrus.Debugf("Migrating state from v2 to v3")
 				if st3, err := migrateStateV2(raw); err != nil {
 					return nil, false, err
 				} else {
@@ -100,14 +124,14 @@ func migrateState(raw []byte) (*State, bool, error) {
 				update := selectTPM(&st)
 				return &st, update, err
 			default:
-				log.Debugf("Unknown state type '%s'", str)
+				logrus.Debugf("Unknown state type '%s'", str)
 				return nil, false, ErrInvalid
 			}
 		} else {
-			log.Debugf("State file type is not a string")
+			logrus.Debugf("State file type is not a string")
 		}
 	} else {
-		log.Debugf("State file has no type")
+		logrus.Debugf("State file has no type")
 	}
 
 	return nil, false, ErrInvalid
