@@ -35,6 +35,7 @@ var (
 	releaseId              string = "unknown"
 	defaultEndorsementAuth string = ""
 	defaultNameHint        string = "Server"
+	defaultServerURL       string = "https://api.immu.ne/v2"
 	cli                    rootCmd
 )
 
@@ -66,7 +67,7 @@ func (v traceFlag) BeforeApply() error {
 
 type rootCmd struct {
 	// Global options
-	Server   *url.URL    `name:"server" help:"immune SaaS API URL" default:"${server_default_url}" type:"*url.URL"`
+	Server   *url.URL    `name:"server" help:"immune SaaS API URL" type:"*url.URL"`
 	CA       string      `name:"server-ca" help:"immune SaaS API CA (PEM encoded)" optional type:"path"`
 	StateDir string      `name:"state-dir" default:"${state_default_dir}" help:"Directory holding the cli state" type:"path"`
 	LogFlag  bool        `name:"log" help:"Force log output on and text UI off"`
@@ -94,6 +95,8 @@ type attestCmd struct {
 
 func (enroll *enrollCmd) Run(glob *globalOptions) error {
 	ctx := context.Background()
+
+	// store used TPM in state, use dummy TPM only if forced
 	if enroll.DummyTPM {
 		glob.State.TPM = state.DummyTPMIdentifier
 	} else {
@@ -107,6 +110,12 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 		return err
 	}
 	tui.SetUIState(tui.StSelectTASuccess)
+
+	// when server is set on cmdline during enroll store it in state
+	// so OS startup scripts can attest without needing to know the server URL
+	if cli.Server != nil {
+		glob.State.ServerURL = cli.Server
+	}
 
 	if err := attestation.Enroll(ctx, &glob.Client, enroll.Token, glob.EndorsementAuth, defaultNameHint, glob.Anchor, glob.State); err != nil {
 		tui.SetUIState(tui.StEnrollFailed)
@@ -247,9 +256,8 @@ func run() int {
 			Summary: true,
 		}),
 		kong.Vars{
-			"tpm_default_path":   state.DefaultTPMDevice(),
-			"state_default_dir":  state.DefaultStateDir(),
-			"server_default_url": "https://api.immu.ne/v2",
+			"tpm_default_path":  state.DefaultTPMDevice(),
+			"state_default_dir": state.DefaultStateDir(),
 		},
 		kong.Bind(&glob))
 
@@ -397,6 +405,20 @@ func initClient(glob *globalOptions) error {
 		}
 	}
 
-	glob.Client = api.NewClient(cli.Server, caCert, releaseId)
+	// use server URL in state, if any, with cmdline setting taking precedence
+	var server *url.URL
+	if cli.Server != nil {
+		server = cli.Server
+	} else if glob.State.ServerURL != nil {
+		server = glob.State.ServerURL
+	} else {
+		var err error
+		server, err = url.Parse(defaultServerURL)
+		if err != nil {
+			logrus.Fatal("default server URL is invalid")
+		}
+	}
+
+	glob.Client = api.NewClient(server, caCert, releaseId)
 	return nil
 }
