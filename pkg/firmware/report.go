@@ -127,7 +127,7 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	// System memory map
 	fwData.Memory.Error = api.NotImplemented
 
-	// FWUPd version and device list
+	// FWUPD version and device list
 	fwData.Devices = new(api.Devices)
 	err = fwupd.ReportFWUPD(fwData.Devices)
 	if err != nil {
