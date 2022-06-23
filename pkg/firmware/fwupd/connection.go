@@ -2,6 +2,7 @@ package fwupd
 
 import (
 	"github.com/godbus/dbus/v5"
+	"github.com/sirupsen/logrus"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 )
@@ -9,6 +10,8 @@ import (
 func ReportFWUPD(devs *api.Devices) error {
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
+		logrus.Debugf("fwupd.ReportFWUPD(): %s", err.Error())
+		logrus.Warnf("Failed to connect to FWUPD via DBUS")
 		return err
 	}
 	defer conn.Close()
@@ -16,6 +19,8 @@ func ReportFWUPD(devs *api.Devices) error {
 	obj := conn.Object("org.freedesktop.fwupd", "/")
 	v, err := obj.GetProperty("org.freedesktop.fwupd.DaemonVersion")
 	if err != nil {
+		logrus.Debugf("fwupd.ReportFWUPD(): %s", err.Error())
+		logrus.Warnf("Failed to get FWUPD version info")
 		return err
 	}
 	devs.FWUPdVersion = v.String()
@@ -23,6 +28,8 @@ func ReportFWUPD(devs *api.Devices) error {
 	var devices []map[string]dbus.Variant
 	err = obj.Call("org.freedesktop.fwupd.GetDevices", 0).Store(&devices)
 	if err != nil {
+		logrus.Debugf("fwupd.ReportFWUPD(): %s", err.Error())
+		logrus.Warnf("Failed to get FWUPD devices")
 		return err
 	}
 
