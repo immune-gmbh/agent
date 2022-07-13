@@ -190,6 +190,15 @@ func doAttest(glob *globalOptions, ctx context.Context, dumpReportTo string, dry
 		return nil
 	}
 
+	// setting these states will just toggle internal flags in tui
+	// which later affect the trust chain render
+	if appraisal.Verdict.SupplyChain == api.Unsupported {
+		tui.SetUIState(tui.StTscUnsupported)
+	}
+	if appraisal.Verdict.EndpointProtection == api.Unsupported {
+		tui.SetUIState(tui.StEppUnsupported)
+	}
+
 	if appraisal.Verdict.Result == api.Trusted {
 		tui.SetUIState(tui.StDeviceTrusted)
 		tui.SetUIState(tui.StChainAllGood)
