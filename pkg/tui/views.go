@@ -17,6 +17,8 @@ var chainTexts []string = []string{
 	"Endpoint Protection",
 }
 
+const eppStep = 5
+
 type Spinner struct {
 	Spinner  *spinner.Spinner
 	Current  string
@@ -91,12 +93,17 @@ func showSpinner(message string) {
 	step.Spinner.Start()
 }
 
-func renderChainElement(first bool, odd bool, fail bool, text string) {
+func renderChainElement(first, odd, enabled, fail bool, text string) {
 	color.Set(color.BgBlack)
-	if fail {
-		color.Set(color.FgRed)
+
+	if !enabled {
+		color.Set(color.FgWhite)
 	} else {
-		color.Set(color.FgGreen)
+		if fail {
+			color.Set(color.FgRed)
+		} else {
+			color.Set(color.FgGreen)
+		}
 	}
 
 	var pre string
@@ -110,10 +117,14 @@ func renderChainElement(first bool, odd bool, fail bool, text string) {
 
 	fmt.Print(pre + "/  \\")
 
-	if fail {
-		color.Set(color.FgRed)
+	if !enabled {
+		color.Set(color.FgWhite)
 	} else {
-		color.Set(color.FgGreen)
+		if fail {
+			color.Set(color.FgRed)
+		} else {
+			color.Set(color.FgGreen)
+		}
 	}
 
 	color.Set(color.FgWhite)
@@ -124,30 +135,43 @@ func renderChainElement(first bool, odd bool, fail bool, text string) {
 		fmt.Print(".... ")
 	}
 
-	if fail {
-		color.Set(color.FgHiRed)
-		fmt.Print(Cross + " ")
+	if !enabled {
+		color.Set(color.FgWhite)
+		fmt.Print("o ")
 	} else {
-		color.Set(color.FgHiGreen)
-		fmt.Print(CheckMark + " ")
+		if fail {
+			color.Set(color.FgHiRed)
+			fmt.Print(Cross + " ")
+		} else {
+			color.Set(color.FgHiGreen)
+			fmt.Print(CheckMark + " ")
+		}
 	}
 
 	color.Set(color.FgHiWhite)
 	fmt.Println(text)
 
-	if fail {
-		color.Set(color.FgRed)
+	if !enabled {
+		color.Set(color.FgWhite)
 	} else {
-		color.Set(color.FgGreen)
+		if fail {
+			color.Set(color.FgRed)
+		} else {
+			color.Set(color.FgGreen)
+		}
 	}
 
 	fmt.Println(pre + "\\__/")
 }
 
-func showTrustChain(failAt int) {
-	renderChainElement(true, false, failAt == 0, chainTexts[0])
+func showTrustChain(failAt int, tscSupported, eppSupported bool) {
+	renderChainElement(true, false, tscSupported, failAt == 0, chainTexts[0])
 	for i := 1; i < len(chainTexts); i++ {
-		renderChainElement(false, i&1 == 1, i >= failAt, chainTexts[i])
+		eppEnabled := true
+		if i == eppStep {
+			eppEnabled = eppSupported
+		}
+		renderChainElement(false, i&1 == 1, eppEnabled, i >= failAt, chainTexts[i])
 	}
 	color.Unset()
 }
