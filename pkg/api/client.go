@@ -334,12 +334,11 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 
 	if readBody {
 		respBytes, err := ioutil.ReadAll(resp.Body)
+		logrus.Debugf("HTTP body: %s", string(respBytes)) // always try to print anything we got
 		if err != nil {
 			logrus.Debugf("Reading server response: %s", err)
 			return nil, NetworkError
 		}
-
-		logrus.Debugf("HTTP body: %s", string(respBytes))
 
 		if ctype, ok := resp.Header["Content-Type"]; ok {
 			ok = false
