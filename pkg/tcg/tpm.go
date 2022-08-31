@@ -343,9 +343,6 @@ func OpenTPM(tpmPath string, stubState *state.StubState) (anchor TrustAnchor, er
 		anchor, err = stubTPM(stubState)
 		return
 
-	case "builtin":
-		rwc, err = NewSimulator()
-
 	case "system":
 		if runtime.GOOS == "windows" {
 			rwc, err = osOpenTPM("")
