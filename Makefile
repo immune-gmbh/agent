@@ -12,7 +12,6 @@ DEPS-CLIENT:=$(SRCS-CLIENT) $(wildcard pkg/firmware/*/*.go) $(wildcard pkg/*/*.g
 # build-time parameters, values
 RELEASE_ID?=$(shell git describe --tags)
 GO_ENV:=CGO_ENABLED=0 GOARCH=amd64
-CGO_ENV:=CGO_ENABLED=1 GOARCH=amd64
 LDFLAGS:=-X main.releaseId=$(RELEASE_ID) -s -w $(LDFLAGS_EXTRA)
 LDFLAGS-STATIC:=$(LDFLAGS) -extldflags "-static"
 
