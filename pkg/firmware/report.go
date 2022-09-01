@@ -89,7 +89,7 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 
 	// Trusted Platform Module event log
 	if tpmConn != nil {
-		srtmlog.ReportTPM2EventLog(&fwData.TPM2EventLog, tpmConn)
+		srtmlog.ReportTPM2EventLog(fwData.TPM2EventLogZ, tpmConn)
 	}
 
 	// Trusted Platform Module 2 properties

@@ -1,12 +1,16 @@
 package srtmlog
 
 import (
+	"errors"
 	"io"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
+	"github.com/klauspost/compress/zstd"
 	"github.com/sirupsen/logrus"
 )
+
+var ErrNoEventLog = common.ErrorNoResponse(errors.New("no event log found"))
 
 func ReportTPM2EventLog(log *api.ErrorBuffer, conn io.ReadWriteCloser) error {
 	logrus.Traceln("ReportTPM2EventLog()")
@@ -19,6 +23,14 @@ func ReportTPM2EventLog(log *api.ErrorBuffer, conn io.ReadWriteCloser) error {
 		log.Error = common.ServeApiError(common.MapFSErrors(err))
 		return err
 	}
-	log.Data = buf
+
+	if len(buf) > 0 {
+		encoder, err := zstd.NewWriter(nil)
+		if err != nil {
+			return err
+		}
+		log.Data = encoder.EncodeAll(buf, make([]byte, 0, len(buf)))
+	}
+
 	return nil
 }

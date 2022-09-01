@@ -61,6 +61,7 @@ type FirmwareProperties struct {
 	VTdRegisterSet  ErrorBuffer        `json:"vtd"`
 	Flash           ErrorBuffer        `json:"flash"`
 	TPM2EventLog    ErrorBuffer        `json:"event_log"`
+	TPM2EventLogZ   *ErrorBuffer       `json:"event_log_z,omitempty"`
 	MACAddresses    MACAddresses       `json:"mac"`
 	OS              OS                 `json:"os"`
 	NICs            *NICList           `json:"nic,omitempty"`
