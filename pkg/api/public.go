@@ -67,6 +67,7 @@ type FirmwareProperties struct {
 	Memory          Memory             `json:"memory"`
 	Agent           *Agent             `json:"agent,omitempty"`
 	Devices         *Devices           `json:"devices,omitempty"`
+	IMALog          *ErrorBuffer       `json:"ima_log,omitempty"`
 }
 
 type Devices struct {

@@ -14,6 +14,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/cpuid"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/fwupd"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/heci"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware/ima"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/msr"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/netif"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/osinfo"
@@ -103,6 +104,9 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 		}
 		fwData.TPM2NVRAM = append(fwData.TPM2NVRAM, val)
 	}
+
+	// Linux Integrity Measurement Architechture runtime measurement log
+	ima.ReportIMALog(fwData.IMALog)
 
 	// Intel Management Engine
 	if cpuVendor == cpuid.VendorIntel {
