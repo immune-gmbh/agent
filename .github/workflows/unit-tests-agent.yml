@@ -7,15 +7,13 @@ jobs:
     strategy:
       matrix:
         sys:
-          - { os: ubuntu-18.04, shell: bash, cgo_ldlags: "" }
-          - { os: windows-2019, shell: "msys2 {0}", cgo_ldlags: "-lssp" }
+          - { os: ubuntu-18.04 }
+          - { os: windows-2019 }
     env:
       OS: ${{ matrix.sys.os }}
-      CGO_LDFLAGS: ${{ matrix.sys.cgo_ldlags }}
       
     defaults:
       run:
-        shell: ${{ matrix.sys.shell }}
         working-directory: ./
 
     steps:
@@ -31,13 +29,6 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: "1.17"
-      - name: Set up CGO environment for windows
-        if: ${{ runner.os == 'Windows' }}
-        uses: msys2/setup-msys2@v2
-        with:
-          release: false
-          path-type: inherit
-          install: gcc openssl-devel gcc-libs
       - id: go-cache-paths
         run: |
           echo "::set-output name=go-build::$(go env GOCACHE)"
