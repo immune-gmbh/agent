@@ -2,8 +2,6 @@ module github.com/immune-gmbh/agent/v3
 
 go 1.17
 
-replace github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt v3.2.0+incompatible
-
 replace github.com/google/go-tpm => github.com/immune-gmbh/go-tpm v0.3.4-0.20220310140359-93b752e22d71
 
 replace github.com/google/go-licenses => github.com/immune-gmbh/go-licenses v0.0.0-20220315163301-4fcf8ee2902b
