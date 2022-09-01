@@ -11,9 +11,8 @@ import (
 	"testing/quick"
 
 	"github.com/google/go-tpm-tools/client"
+	"github.com/google/go-tpm-tools/simulator"
 	"github.com/google/go-tpm/tpm2"
-
-	test "github.com/immune-gmbh/agent/v3/internal/testing"
 )
 
 func TestEncodeEmptyBuffer(t *testing.T) {
@@ -127,12 +126,21 @@ func TestQName(t *testing.T) {
 	}
 }
 
+func GetTpmSimulator(t *testing.T) *simulator.Simulator {
+	t.Helper()
+	simulator, err := simulator.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return simulator
+}
+
 func TestQNameIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skipf("skipping integration test")
 	}
 
-	conn := test.GetTpmSimulator(t)
+	conn := GetTpmSimulator(t)
 	defer client.CheckedClose(t, conn)
 
 	// TPM2_CreatePrimary: create the key
