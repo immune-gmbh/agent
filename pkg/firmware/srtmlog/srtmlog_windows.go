@@ -1,6 +1,7 @@
 package srtmlog
 
 import (
+	"encoding/binary"
 	"io"
 	"syscall"
 	"unsafe"
@@ -67,6 +68,10 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 		return nil, error(tbsErr)
 	}
 
+	if logLen == 0 {
+		return nil, ErrNoEventLog
+	}
+
 	// logBuffer may hold multiple concatenated logs (boot log + hibernate/resume logs)
 	logBuffer := make([]byte, logLen)
 
@@ -83,6 +88,12 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 			}
 			continue
 		}
+
+		// trim end marker
+		if len(logBuffer) > 3 || binary.LittleEndian.Uint32(logBuffer[len(logBuffer)-4:]) == 0xFFFFFFFF {
+			logBuffer = logBuffer[:len(logBuffer)-4]
+		}
+
 		break
 	}
 
@@ -99,10 +110,16 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		if logLen == 0 {
+			return nil, ErrNoEventLog
+		}
 		logBuffer = make([]byte, logLen)
 		if _, err = context.GetTCGLog(logBuffer); err != nil {
 			return nil, err
 		}
+		newBuf := make([]byte, 4)
+		binary.LittleEndian.PutUint32(newBuf, uint32(len(logBuffer)))
+		logBuffer = append(newBuf, logBuffer...)
 	}
 
 	return logBuffer, nil
