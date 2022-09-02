@@ -20,7 +20,7 @@ require (
 	github.com/google/jsonapi v1.0.0
 	github.com/google/uuid v1.3.0
 	github.com/gowebpki/jcs v1.0.0
-	github.com/klauspost/compress v1.15.1
+	github.com/klauspost/compress v1.15.9
 	github.com/mattn/go-colorable v0.1.12
 	github.com/mattn/go-isatty v0.0.14
 	github.com/shirou/gopsutil v3.21.11+incompatible
