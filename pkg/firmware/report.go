@@ -89,6 +89,7 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 
 	// Trusted Platform Module event log
 	if tpmConn != nil {
+		fwData.TPM2EventLogZ = new(api.ErrorBuffer)
 		srtmlog.ReportTPM2EventLog(fwData.TPM2EventLogZ, tpmConn)
 	}
 
@@ -106,6 +107,7 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	}
 
 	// Linux Integrity Measurement Architechture runtime measurement log
+	fwData.IMALog = new(api.ErrorBuffer)
 	ima.ReportIMALog(fwData.IMALog)
 
 	// Intel Management Engine
