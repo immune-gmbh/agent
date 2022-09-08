@@ -5,6 +5,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 )
 
@@ -114,7 +115,7 @@ func queryFullProcessImageName(procHandle windows.Handle) (string, error) {
 		}
 	}
 
-	return "", errors.New("buffer too small")
+	return "", errors.New("image name buffer too small")
 }
 
 func QueryProcessProtectionLvl(procHandle windows.Handle) (PsProtectedType, PsProtectedSigner, error) {
@@ -140,12 +141,12 @@ func enumProcesses() ([]uint32, error) {
 		}
 
 		// if we got less data than our buffer is long then probably we have all processes
-		if i < int(bytesReturned/4) {
+		if int(bytesReturned/4) < i {
 			return processIds[:(bytesReturned / 4)], nil
 		}
 	}
 
-	return nil, errors.New("buffer too small")
+	return nil, errors.New("process list buffer too small")
 }
 
 func getFullImagePathOnlyIfPPLProc(processId uint32) (string, error) {
@@ -176,18 +177,16 @@ func ListPPLProcessImagePaths() ([]string, error) {
 	}
 
 	var list []string
-	var lastErr error
 	for _, id := range procIds {
 		name, err := getFullImagePathOnlyIfPPLProc(id)
+		if name == "" {
+			continue
+		}
 		if err == nil {
 			list = append(list, name)
 		} else {
-			lastErr = err
+			logrus.Tracef("epp.getFullImagePathOnlyIfPPLProc(): procId #%v %s", id, err.Error())
 		}
-	}
-
-	if len(list) == 0 {
-		return list, lastErr
 	}
 
 	return list, nil

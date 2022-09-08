@@ -12,6 +12,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/biosflash"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/cpuid"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware/epp"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/fwupd"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/heci"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/ima"
@@ -109,6 +110,10 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	// Linux Integrity Measurement Architechture runtime measurement log
 	fwData.IMALog = new(api.ErrorBuffer)
 	ima.ReportIMALog(fwData.IMALog)
+
+	// Linux Integrity Measurement Architechture runtime measurement log
+	fwData.EPPInfo = new(api.EPPInfo)
+	epp.ReportEPP(fwData.EPPInfo)
 
 	// Intel Management Engine
 	if cpuVendor == cpuid.VendorIntel {
