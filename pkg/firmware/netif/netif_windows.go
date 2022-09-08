@@ -3,7 +3,7 @@ package netif
 import (
 	"strings"
 
-	"github.com/StackExchange/wmi"
+	"github.com/yusufpapurcu/wmi"
 )
 
 const (

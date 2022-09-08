@@ -7,7 +7,6 @@ replace github.com/google/go-tpm => github.com/immune-gmbh/go-tpm v0.3.4-0.20220
 replace github.com/google/go-licenses => github.com/immune-gmbh/go-licenses v0.0.0-20220315163301-4fcf8ee2902b
 
 require (
-	github.com/StackExchange/wmi v1.2.1
 	github.com/alecthomas/kong v0.5.0
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/briandowns/spinner v1.18.1
@@ -26,6 +25,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
+	github.com/yusufpapurcu/wmi v1.2.2
 	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8
 )
 
@@ -52,7 +52,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect
-	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
 	golang.org/x/mod v0.5.0 // indirect
 	golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d // indirect
