@@ -69,6 +69,28 @@ type FirmwareProperties struct {
 	Agent           *Agent             `json:"agent,omitempty"`
 	Devices         *Devices           `json:"devices,omitempty"`
 	IMALog          *ErrorBuffer       `json:"ima_log,omitempty"`
+	EPPInfo         *EPPInfo           `json:"epp_info,omitempty"`
+}
+
+type EPPInfo struct {
+	AntimalwareProcesses    map[string]HashBlob `json:"antimalware_processes,omitempty"` // path -> exe file
+	AntimalwareProcessesErr FirmwareError       `json:"antimalware_processes_err,omitempty"`
+	EarlyLaunchDrivers      map[string]HashBlob `json:"early_launch_drivers,omitempty"` // path -> sys file
+	EarlyLaunchDriversErr   FirmwareError       `json:"early_launch_drivers_err,omitempty"`
+	ESET                    *ESETConfig         `json:"eset,omitempty"` // Linux only
+}
+
+type ESETConfig struct {
+	Enabled           string `json:"enabled"`
+	ExcludedFiles     string `json:"excluded_files"`
+	ExcludedProcesses string `json:"excluded_processes"`
+}
+
+type HashBlob struct {
+	Sha256 Buffer        `json:"sha256,omitempty"` // hash of uncompressed data
+	ZData  Buffer        `json:"z_data,omitempty"` // zstd compressed data, maybe omitted if data is assumed to be known
+	Data   Buffer        `json:"data,omitempty"`   // deprecated: uncompressed data for backwards compatibility to ErrorBuffer
+	Error  FirmwareError `json:"error,omitempty"`  // FirmwareErr*
 }
 
 type Devices struct {
