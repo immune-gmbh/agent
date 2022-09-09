@@ -2,14 +2,37 @@ package srtmlog
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"io"
+	"math"
+	"os"
+	"path/filepath"
 	"syscall"
 	"unsafe"
 
 	"github.com/google/go-tpm/tpmutil/tbs"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
-const TBS_GET_ALL_LOGS_FLAG = 1
+const (
+	TBS_GET_ALL_LOGS_FLAG = 1
+
+	// the default directory under the windows root directory that holds WBCL logs
+	defaultWBCLSubDirectory = "Logs\\MeasuredBoot"
+
+	// this key holds various TPM (driver) related info; relative to HKLM
+	regKeyTPM = "System\\CurrentControlSet\\services\\TPM"
+
+	// alternate WBCL log path can be specified with the following value under TPM key
+	regValAlternateWBCLPath = "WBCLPath" // optional
+
+	// this values hold the current OS boot and resume count under the TPM key
+	regValOsBootCount   = "OsBootCount"
+	regValOsResumeCount = "OsResumeCount" // optional
+)
 
 // use windows TPM base services DLL to call Tbsi_Get_TCG_Logs
 // https://docs.microsoft.com/en-us/windows/win32/tbs/tbs-functions
@@ -61,7 +84,104 @@ func getAllTCGLogs(logBuffer []byte) (uint32, tbs.Error) {
 	return logBufferLenNew, getError(result)
 }
 
-func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
+func getDefaultWBCLPath() (string, error) {
+	winDir, err := windows.GetSystemWindowsDirectory()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(winDir, defaultWBCLSubDirectory), nil
+}
+
+func getWBCLPathAndBootCount() (string, uint64, uint64, error) {
+	regKey, err := registry.OpenKey(registry.LOCAL_MACHINE, regKeyTPM, uint32(registry.QUERY_VALUE))
+	if err != nil {
+		return "", 0, 0, err
+	}
+	defer regKey.Close()
+
+	wbclPath, _, err := regKey.GetStringValue(regValAlternateWBCLPath)
+	// if the alternate WBCL path isn't specified we use the default one
+	if err == registry.ErrNotExist {
+		wbclPath, err = getDefaultWBCLPath()
+		if err != nil {
+			return "", 0, 0, err
+		}
+	} else if err != nil {
+		return "", 0, 0, err
+	}
+
+	osBootCount, _, err := regKey.GetIntegerValue(regValOsBootCount)
+	if err != nil {
+		return "", 0, 0, err
+	}
+
+	osResumeCount, _, err := regKey.GetIntegerValue(regValOsResumeCount)
+	// if the OS can not hibernate then there is no resume count (applies to servers)
+	if err == registry.ErrNotExist {
+		osResumeCount = 0
+	} else if err != nil {
+		return "", 0, 0, err
+	}
+
+	return wbclPath, osBootCount, osResumeCount, nil
+}
+
+func makeWBCLFilePath(wbclPath string, bootCount, resumeCount uint32) string {
+	return filepath.Join(wbclPath, fmt.Sprintf("%010d-%010d.log", bootCount, resumeCount))
+}
+
+// try to get the WBCL logs from a known location on disk
+// the disk storage is also what is used by most windows TBS functions
+func getAllWBCLLogsFromDisk() ([]byte, error) {
+	wbclPath, osBootCount, osResumeCount, err := getWBCLPathAndBootCount()
+	if err != nil {
+		return nil, err
+	}
+
+	// check reasonable counter values
+	if osBootCount > math.MaxUint32 {
+		return nil, errors.New("boot counter too large")
+	}
+	if osResumeCount > math.MaxUint16 {
+		return nil, errors.New("resume counter too large")
+	}
+
+	// see if boot log exists under current dir, otherwise try default dir
+	if _, err := os.Stat(makeWBCLFilePath(wbclPath, uint32(osBootCount), 0)); errors.Is(err, os.ErrNotExist) {
+		logrus.Tracef("srtmlog.getAllWBCLLogsFromDisk(): alternate WBCL path not working: %v", wbclPath)
+		wbclPath, err = getDefaultWBCLPath()
+		if err != nil {
+			return nil, err
+		}
+		logrus.Tracef("srtmlog.getAllWBCLLogsFromDisk(): falling back to default WBCL path: %v", wbclPath)
+	} else if err != nil {
+		return nil, err
+	}
+
+	// see if boot log exists in default dir
+	if _, err := os.Stat(makeWBCLFilePath(wbclPath, uint32(osBootCount), 0)); err != nil {
+		return nil, err
+	}
+
+	// get all logs up to the most recent resume
+	var concatWBCL []byte
+	for resume := uint32(0); resume <= uint32(osResumeCount); resume++ {
+		buf, err := os.ReadFile(makeWBCLFilePath(wbclPath, uint32(osBootCount), uint32(resume)))
+		if err != nil {
+			return nil, err
+		}
+
+		prefix := make([]byte, 4)
+		binary.LittleEndian.PutUint32(prefix, uint32(len(buf)))
+		concatWBCL = append(concatWBCL, prefix...)
+		concatWBCL = append(concatWBCL, buf...)
+	}
+
+	return concatWBCL, nil
+}
+
+// try to obtain WBCLs using windows API functions
+func readTPM2EventLogWinApi(conn io.ReadWriteCloser) ([]byte, error) {
 	// Run command first with nil buffer to get required buffer size.
 	logLen, tbsErr := getAllTCGLogs(nil)
 	if tbsErr != 0 {
@@ -86,6 +206,7 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 			if tbsErr != tbs.ErrInsufficientBuffer {
 				return nil, error(tbsErr)
 			}
+			logrus.Trace("srtmlog.readTPM2EventLogWinApi(): retrying getAllTCGLogs()")
 			continue
 		}
 
@@ -99,6 +220,7 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 
 	// fall back to just getting the current event log
 	if tbsErr == tbs.ErrInsufficientBuffer {
+		logrus.Debug("srtmlog.getAllTCGLogs(): failed, falling back to getting only current TCG log")
 		context, err := tbs.CreateContext(tbs.TPMVersion20, tbs.IncludeTPM20|tbs.IncludeTPM12)
 		if err != nil {
 			return nil, err
@@ -123,4 +245,20 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 	}
 
 	return logBuffer, nil
+}
+
+func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
+	// try to get all current WBCL logs from on-disk location first
+	// this is more reliable than getAllTCGLogs() and more complete than GetTCGLog()
+	logs, err := getAllWBCLLogsFromDisk()
+	if err != nil {
+		logrus.Debugf("srtmlog.getAllWBCLLogsFromDisk(): failed to get WBCLs from disk, falling back to API: %v", err)
+		// try to use API functions as fallback
+		logs, err = readTPM2EventLogWinApi(conn)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return logs, nil
 }
