@@ -62,6 +62,7 @@ type FirmwareProperties struct {
 	Flash           ErrorBuffer        `json:"flash"`
 	TPM2EventLog    ErrorBuffer        `json:"event_log"`
 	TPM2EventLogZ   *ErrorBuffer       `json:"event_log_z,omitempty"`
+	PCPQuoteKeys    map[string]Buffer  `json:"pcp_quote_keys,omitempty"` // windows only
 	MACAddresses    MACAddresses       `json:"mac"`
 	OS              OS                 `json:"os"`
 	NICs            *NICList           `json:"nic,omitempty"`
