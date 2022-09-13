@@ -27,6 +27,9 @@ const (
 	// this key holds various TPM (driver) related info; relative to HKLM
 	regKeyTPM = "System\\CurrentControlSet\\services\\TPM"
 
+	// this key holds all registered AIKs used to quote boot + hibernate/resume event logs
+	regKeyPlatformQuoteKeys = regKeyTPM + "\\PlatformQuoteKeys"
+
 	// alternate WBCL log path can be specified with the following value under TPM key
 	regValAlternateWBCLPath = "WBCLPath" // optional
 
@@ -266,4 +269,29 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 
 func mapErrors(err error) error {
 	return common.MapTBSErrors(err)
+}
+
+// grab Platform Crypto Provider AIKs registered to quote boot and hibernate/resume event logs
+func PCPQuoteKeys() ([]string, [][]byte, error) {
+	regKey, err := registry.OpenKey(registry.LOCAL_MACHINE, regKeyPlatformQuoteKeys, uint32(registry.QUERY_VALUE))
+	if err != nil {
+		return nil, nil, err
+	}
+	defer regKey.Close()
+
+	valNames, err := regKey.ReadValueNames(-1)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	names, keys := []string{}, [][]byte{}
+	for _, keyName := range valNames {
+		keyBlob, _, err := regKey.GetBinaryValue(keyName)
+		if err == nil {
+			names = append(names, keyName)
+			keys = append(keys, keyBlob)
+		}
+	}
+
+	return names, keys, nil
 }

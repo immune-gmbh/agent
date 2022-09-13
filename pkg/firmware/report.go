@@ -91,6 +91,8 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	if tpmConn != nil {
 		fwData.TPM2EventLogZ = new(api.ErrorBuffer)
 		srtmlog.ReportTPM2EventLog(fwData.TPM2EventLogZ, tpmConn)
+
+		fwData.PCPQuoteKeys, _ = srtmlog.ReportPCPQuoteKeys()
 	}
 
 	// Trusted Platform Module 2 properties

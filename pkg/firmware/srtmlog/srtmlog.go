@@ -34,3 +34,19 @@ func ReportTPM2EventLog(log *api.ErrorBuffer, conn io.ReadWriteCloser) error {
 
 	return nil
 }
+
+func ReportPCPQuoteKeys() (map[string]api.Buffer, error) {
+	quoteKeys := make(map[string]api.Buffer)
+	names, blobs, err := PCPQuoteKeys()
+	if err != nil {
+		logrus.Debugf("srtmlog.PCPQuoteKeys(): %s", err.Error())
+		logrus.Warnf("Failed to read PCP quote keys")
+	} else if len(names) == len(blobs) && len(names) > 0 {
+		for i, name := range names {
+			quoteKeys[name] = blobs[i]
+		}
+		return quoteKeys, nil
+	}
+
+	return nil, nil
+}
