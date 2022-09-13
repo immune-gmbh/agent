@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	"github.com/google/go-tpm/tpmutil/tbs"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
@@ -261,4 +262,8 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 	}
 
 	return logs, nil
+}
+
+func mapErrors(err error) error {
+	return common.MapTBSErrors(err)
 }

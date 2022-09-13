@@ -20,7 +20,7 @@ func ReportTPM2EventLog(log *api.ErrorBuffer, conn io.ReadWriteCloser) error {
 		logrus.Debugf("srtmlog.ReportTPM2EventLog(): %s", err.Error())
 		logrus.Warnf("Failed to read TPM 2.0 event log")
 		//XXX map tpmutil errors
-		log.Error = common.ServeApiError(common.MapFSErrors(err))
+		log.Error = common.ServeApiError(mapErrors(common.MapFSErrors(err)))
 		return err
 	}
 
