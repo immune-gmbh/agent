@@ -23,3 +23,8 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 
 	return nil, ErrNoEventLog
 }
+
+// dummy placeholder to allow windows errors to be mapped on win only
+func mapErrors(err error) error {
+	return err
+}
