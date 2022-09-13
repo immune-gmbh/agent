@@ -17,3 +17,7 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 func mapErrors(err error) error {
 	return err
 }
+
+func PCPQuoteKeys() ([]string, [][]byte, error) {
+	return nil, nil, nil
+}
