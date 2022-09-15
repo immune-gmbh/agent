@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 )
 
 func ReportEPP(eppInfo *api.EPPInfo) error {
@@ -16,27 +17,27 @@ func ReportEPP(eppInfo *api.EPPInfo) error {
 		return nil
 	}
 
-	enabled, err := ioutil.ReadFile("/sys/module/eset_rtp/settings/enable")
+	var eset api.ESETConfig
+
+	data, err := ioutil.ReadFile("/sys/module/eset_rtp/settings/enable")
+	eset.Enabled.Data = api.Buffer(data)
 	if err != nil {
 		log.Debugf("Reading settings/enable: %s", err.Error())
-		return err
+		eset.Enabled.Error = common.ServeApiError(common.MapFSErrors(err))
 	}
-	exclFiles, err := ioutil.ReadFile("/sys/module/eset_rtp/settings/excludes/files")
+	data, err = ioutil.ReadFile("/sys/module/eset_rtp/settings/excludes/files")
+	eset.ExcludedFiles.Data = api.Buffer(data)
 	if err != nil {
 		log.Debugf("Reading settings/excludes/files: %s", err.Error())
-		return err
+		eset.ExcludedFiles.Error = common.ServeApiError(common.MapFSErrors(err))
 	}
-	exclProcs, err := ioutil.ReadFile("/sys/module/eset_rtp/settings/excludes/procs")
+	data, err = ioutil.ReadFile("/sys/module/eset_rtp/settings/excludes/procs")
+	eset.ExcludedProcesses.Data = api.Buffer(data)
 	if err != nil {
 		log.Debugf("Reading settings/excludes/procs: %s", err.Error())
-		return err
+		eset.ExcludedProcesses.Error = common.ServeApiError(common.MapFSErrors(err))
 	}
 
-	eppInfo.ESET = &api.ESETConfig{
-		Enabled:           string(enabled),
-		ExcludedFiles:     string(exclFiles),
-		ExcludedProcesses: string(exclProcs),
-	}
-
+	eppInfo.ESET = &eset
 	return nil
 }

@@ -81,9 +81,9 @@ type EPPInfo struct {
 }
 
 type ESETConfig struct {
-	Enabled           string `json:"enabled"`
-	ExcludedFiles     string `json:"excluded_files"`
-	ExcludedProcesses string `json:"excluded_processes"`
+	Enabled           ErrorBuffer `json:"enabled"`
+	ExcludedFiles     ErrorBuffer `json:"excluded_files"`
+	ExcludedProcesses ErrorBuffer `json:"excluded_processes"`
 }
 
 type HashBlob struct {
