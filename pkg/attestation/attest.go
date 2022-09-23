@@ -18,6 +18,7 @@ import (
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware/ima"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
@@ -135,6 +136,10 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 		return nil, "", err
 	}
 	aikHandle.Flush(anchor)
+
+	// fetch the runtime measurment log
+	fwProps.IMALog = new(api.ErrorBuffer)
+	ima.ReportIMALog(fwProps.IMALog)
 
 	cookie, _ := api.Cookie(rand.Reader)
 	evidence := api.Evidence{
