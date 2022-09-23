@@ -24,6 +24,48 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 )
 
+func readAllPCRBanks(ctx context.Context, anchor tcg.TrustAnchor) ([]int, map[string]map[string]api.Buffer, error) {
+	// read all PCRs
+	allPCRs, err := anchor.AllPCRValues()
+	if err != nil {
+		log.Debugf("tcg.AllPCRValues(): %s", err.Error())
+		return nil, nil, err
+	}
+
+	// compute pcr set to quote
+	availPCR := make(map[string]uint32)
+	for algo, bank := range allPCRs {
+		if len(bank) == 0 {
+			continue
+		}
+		var bits uint32
+		for strpcr := range bank {
+			pcr, err := strconv.Atoi(strpcr)
+			if err != nil {
+				log.Debugf("strconv.Atoi(): %s", err.Error())
+				log.Error("Failed to parse PCR index")
+				return nil, nil, err
+			}
+			if pcr < 32 {
+				bits = bits | (1 << pcr)
+			}
+		}
+		availPCR[algo] = bits
+	}
+	var toQuoteBits uint32 = 0xffffffff
+	for _, bits := range availPCR {
+		toQuoteBits = toQuoteBits & bits
+	}
+	var toQuoteInts []int
+	for i := 0; i < 32; i++ {
+		if toQuoteBits&(1<<i) != 0 {
+			toQuoteInts = append(toQuoteInts, int(i))
+		}
+	}
+
+	return toQuoteInts, allPCRs, nil
+}
+
 func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State, releaseId string, dumpEvidenceTo string, dryRun bool) (*api.Appraisal, string, error) {
 	var conn io.ReadWriteCloser
 	if anch, ok := anchor.(*tcg.TCGAnchor); ok {
@@ -53,43 +95,11 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	}
 	fwPropsHash := sha256.Sum256(fwPropsJCS)
 
-	// read all PCRs
-	allPCRs, err := anchor.AllPCRValues()
+	toQuote, allPCRs, err := readAllPCRBanks(ctx, anchor)
 	if err != nil {
-		log.Debugf("tcg.AllPCRValues(): %s", err.Error())
+		log.Debugf("readAllPCRBanks(): %s", err.Error())
 		log.Error("Failed to read all PCR values")
 		return nil, "", err
-	}
-
-	// compute pcr set to quote
-	availPCR := make(map[string]uint32)
-	for algo, bank := range allPCRs {
-		if len(bank) == 0 {
-			continue
-		}
-		var bits uint32
-		for strpcr := range bank {
-			pcr, err := strconv.Atoi(strpcr)
-			if err != nil {
-				log.Debugf("strconv.Atoi(): %s", err.Error())
-				log.Error("Failed to parse PCR index")
-				return nil, "", err
-			}
-			if pcr < 32 {
-				bits = bits | (1 << pcr)
-			}
-		}
-		availPCR[algo] = bits
-	}
-	var toQuoteBits uint32
-	for _, bits := range availPCR {
-		toQuoteBits = toQuoteBits & bits
-	}
-	var toQuoteInts []int
-	for i := 0; i < 32; i++ {
-		if toQuoteBits&(1<<i) != 0 {
-			toQuoteInts = append(toQuoteInts, int(i))
-		}
 	}
 
 	// load Root key
@@ -134,7 +144,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 
 	// convert used PCR banks to tpm2.Algorithm selection for quote
 	var algs []tpm2.Algorithm
-	for k, _ := range allPCRs {
+	for k := range allPCRs {
 		alg, err := strconv.ParseInt(k, 10, 16)
 		if err != nil {
 			log.Debugf("ParseInt failed: %s", err)
@@ -146,7 +156,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 
 	// generate quote
 	log.Traceln("generate quote")
-	quote, sig, err := anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuoteInts)
+	quote, sig, err := anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuote)
 	if err != nil || (sig.ECC == nil && sig.RSA == nil) {
 		log.Debugf("TPM2_Quote failed: %s", err)
 		log.Error("TPM 2.0 attestation failed")
