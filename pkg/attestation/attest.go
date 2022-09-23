@@ -53,26 +53,43 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	}
 	fwPropsHash := sha256.Sum256(fwPropsJCS)
 
-	// read selected PCRs
-	pcrValues, err := anchor.PCRValues(tpm2.Algorithm(st.Config.PCRBank), st.Config.PCRs)
-	if err != nil {
-		log.Debugf("tcg.PCRValues(glob.TpmConn, pcrSel): %s", err.Error())
-		log.Error("Failed to read selected PCR values")
-		return nil, "", err
-	}
-	quotedPCR := []int{}
-	for k := range pcrValues {
-		if i, err := strconv.ParseInt(k, 10, 32); err == nil {
-			quotedPCR = append(quotedPCR, int(i))
-		}
-	}
-
 	// read all PCRs
 	allPCRs, err := anchor.AllPCRValues()
 	if err != nil {
 		log.Debugf("tcg.AllPCRValues(): %s", err.Error())
 		log.Error("Failed to read all PCR values")
 		return nil, "", err
+	}
+
+	// compute pcr set to quote
+	availPCR := make(map[string]uint32)
+	for algo, bank := range allPCRs {
+		if len(bank) == 0 {
+			continue
+		}
+		var bits uint32
+		for strpcr := range bank {
+			pcr, err := strconv.Atoi(strpcr)
+			if err != nil {
+				log.Debugf("strconv.Atoi(): %s", err.Error())
+				log.Error("Failed to parse PCR index")
+				return nil, "", err
+			}
+			if pcr < 32 {
+				bits = bits | (1 << pcr)
+			}
+		}
+		availPCR[algo] = bits
+	}
+	var toQuoteBits uint32
+	for _, bits := range availPCR {
+		toQuoteBits = toQuoteBits & bits
+	}
+	var toQuoteInts []int
+	for i := 0; i < 32; i++ {
+		if toQuoteBits&(1<<i) != 0 {
+			toQuoteInts = append(toQuoteInts, int(i))
+		}
 	}
 
 	// load Root key
@@ -129,7 +146,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 
 	// generate quote
 	log.Traceln("generate quote")
-	quote, sig, err := anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, quotedPCR)
+	quote, sig, err := anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuoteInts)
 	if err != nil || (sig.ECC == nil && sig.RSA == nil) {
 		log.Debugf("TPM2_Quote failed: %s", err)
 		log.Error("TPM 2.0 attestation failed")
@@ -147,7 +164,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 		Quote:     &quote,
 		Signature: &sig,
 		Algorithm: strconv.Itoa(int(st.Config.PCRBank)),
-		PCRs:      pcrValues,
+		PCRs:      allPCRs[strconv.Itoa(int(st.Config.PCRBank))],
 		AllPCRs:   allPCRs,
 		Firmware:  fwProps,
 		Cookie:    cookie,
