@@ -63,7 +63,7 @@ test: deps
 
 .PHONY: license-check
 license-check: deps
-	$(GOLIC) --logtostderr check --exclude-restricted $(SRCS-CLIENT)
+	$(GOLIC) --logtostderr check --ignore github.com/immune-gmbh/agent --exclude-restricted $(SRCS-CLIENT)
 
 # disable many builtin rules
 .SUFFIXES:
