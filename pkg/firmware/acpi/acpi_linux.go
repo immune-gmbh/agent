@@ -2,7 +2,6 @@ package acpi
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 
@@ -15,7 +14,7 @@ var (
 )
 
 func readACPITables() (map[string][]byte, error) {
-	files, err := ioutil.ReadDir(sysfsDir)
+	files, err := os.ReadDir(sysfsDir)
 	if err != nil {
 		return nil, err
 	}

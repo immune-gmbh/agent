@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -47,7 +47,7 @@ func TestClient_Configuration(t *testing.T) {
 		assert.Equal(t, req.URL.String(), targetURL.String())
 		return &http.Response{
 			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBuffer(jsonCfg)),
+			Body:       io.NopCloser(bytes.NewBuffer(jsonCfg)),
 			Header:     make(http.Header),
 		}
 	})
@@ -68,7 +68,7 @@ func TestClient_Configuration(t *testing.T) {
 		return &http.Response{
 			StatusCode: 304,
 			// Send response to be tested
-			Body: ioutil.NopCloser(bytes.NewBuffer(nil)),
+			Body: io.NopCloser(bytes.NewBuffer(nil)),
 			// Must be set to non-nil value or it panics
 			Header: make(http.Header),
 		}

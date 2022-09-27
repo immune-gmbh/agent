@@ -2,7 +2,7 @@ package util
 
 import (
 	"crypto/sha256"
-	"io/ioutil"
+	"os"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
@@ -16,7 +16,7 @@ func Uint32ToStr(in uint32) string {
 
 func SHA256File(file string) ([]byte, error) {
 	h := sha256.New()
-	s, err := ioutil.ReadFile(file)
+	s, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func ZStdFile(file string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	s, err := ioutil.ReadFile(file)
+	s, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}

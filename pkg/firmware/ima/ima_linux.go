@@ -1,9 +1,7 @@
 package ima
 
-import (
-	"io/ioutil"
-)
+import "os"
 
 func readIMALog() ([]byte, error) {
-	return ioutil.ReadFile("/sys/kernel/security/ima/binary_runtime_measurements")
+	return os.ReadFile("/sys/kernel/security/ima/binary_runtime_measurements")
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path"
@@ -409,7 +408,7 @@ func initState(stateDir string, glob *globalOptions) error {
 func initClient(glob *globalOptions) error {
 	var caCert *x509.Certificate
 	if cli.CA != "" {
-		buf, err := ioutil.ReadFile(cli.CA)
+		buf, err := os.ReadFile(cli.CA)
 		if err != nil {
 			logrus.Errorf("Cannot read '%s': %s", cli.CA, err.Error())
 			return err
