@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -333,7 +332,7 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 	}
 
 	if readBody {
-		respBytes, err := ioutil.ReadAll(resp.Body)
+		respBytes, err := io.ReadAll(resp.Body)
 		logrus.Debugf("HTTP body: %s", string(respBytes)) // always try to print anything we got
 		if err != nil {
 			logrus.Debugf("Reading server response: %s", err)

@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"strconv"
 
 	"github.com/google/go-tpm/tpm2"
@@ -190,7 +190,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 		fmt.Println(string(evidenceJSON))
 	} else if dumpEvidenceTo != "" {
 		path := dumpEvidenceTo + ".evidence.json"
-		if err := ioutil.WriteFile(path, evidenceJSON, 0644); err != nil {
+		if err := os.WriteFile(path, evidenceJSON, 0644); err != nil {
 			return nil, "", err
 		}
 		logrus.Infof("Dumped evidence json: %s", path)

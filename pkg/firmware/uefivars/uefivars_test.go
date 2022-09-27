@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package uefivars
@@ -5,7 +6,6 @@ package uefivars
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -60,7 +60,7 @@ func setupUefiVariables(t *testing.T, opts ...interface{}) scenario {
 
 	if includeCanary {
 		buf := []byte{0, 0, 0, 0}
-		err := ioutil.WriteFile(path.Join(tmpdir, "ConOut-8be4df61-93ca-11d2-aa0d-00e098032b8c"), buf, 0640)
+		err := os.WriteFile(path.Join(tmpdir, "ConOut-8be4df61-93ca-11d2-aa0d-00e098032b8c"), buf, 0640)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -91,7 +91,7 @@ func (s *scenario) setupUefiVariable(t *testing.T, name string, opts ...interfac
 	s.Contents = append(s.Contents, buf)
 
 	buf = append([]byte{0, 0, 0, 0}, buf...)
-	err := ioutil.WriteFile(path.Join(s.Tempdir, fmt.Sprintf("%s-%s", name, s.Guid)), buf, 0640)
+	err := os.WriteFile(path.Join(s.Tempdir, fmt.Sprintf("%s-%s", name, s.Guid)), buf, 0640)
 	if err != nil {
 		t.Fatal(err)
 	}

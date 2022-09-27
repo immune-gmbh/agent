@@ -1,7 +1,6 @@
 package epp
 
 import (
-	"io/ioutil"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -19,19 +18,19 @@ func ReportEPP(eppInfo *api.EPPInfo) error {
 
 	var eset api.ESETConfig
 
-	data, err := ioutil.ReadFile("/sys/module/eset_rtp/settings/enable")
+	data, err := os.ReadFile("/sys/module/eset_rtp/settings/enable")
 	eset.Enabled.Data = api.Buffer(data)
 	if err != nil {
 		log.Debugf("Reading settings/enable: %s", err.Error())
 		eset.Enabled.Error = common.ServeApiError(common.MapFSErrors(err))
 	}
-	data, err = ioutil.ReadFile("/sys/module/eset_rtp/settings/excludes/files")
+	data, err = os.ReadFile("/sys/module/eset_rtp/settings/excludes/files")
 	eset.ExcludedFiles.Data = api.Buffer(data)
 	if err != nil {
 		log.Debugf("Reading settings/excludes/files: %s", err.Error())
 		eset.ExcludedFiles.Error = common.ServeApiError(common.MapFSErrors(err))
 	}
-	data, err = ioutil.ReadFile("/sys/module/eset_rtp/settings/excludes/procs")
+	data, err = os.ReadFile("/sys/module/eset_rtp/settings/excludes/procs")
 	eset.ExcludedProcesses.Data = api.Buffer(data)
 	if err != nil {
 		log.Debugf("Reading settings/excludes/procs: %s", err.Error())

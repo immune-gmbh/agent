@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -74,7 +73,7 @@ func LoadState(keysPath string) (*State, bool, error) {
 		return nil, false, err
 	}
 
-	file, err := ioutil.ReadFile(keysPath)
+	file, err := os.ReadFile(keysPath)
 	if err != nil {
 		return nil, false, err
 	}
@@ -148,7 +147,7 @@ func (st *State) Store(keysPath string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(keysPath, str, 0600)
+	return os.WriteFile(keysPath, str, 0600)
 }
 
 func NewState() *State {
