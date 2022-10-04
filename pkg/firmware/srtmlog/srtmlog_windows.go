@@ -36,6 +36,12 @@ const (
 	// this values hold the current OS boot and resume count under the TPM key
 	regValOsBootCount   = "OsBootCount"
 	regValOsResumeCount = "OsResumeCount" // optional
+
+	// this key holds various volatile TPM related info; relative to HKLM
+	regKeyIntegrity = "System\\CurrentControlSet\\Control\\IntegrityServices"
+
+	// this value holds the current WBCL
+	regValWBCL = "WBCL"
 )
 
 // use windows TPM base services DLL to call Tbsi_Get_TCG_Logs
@@ -251,16 +257,40 @@ func readTPM2EventLogWinApi(conn io.ReadWriteCloser) ([]byte, error) {
 	return logBuffer, nil
 }
 
+// try to obtain current WBCL from registry
+func readTPM2EventLogRegistry() ([]byte, error) {
+	regKey, err := registry.OpenKey(registry.LOCAL_MACHINE, regKeyIntegrity, uint32(registry.QUERY_VALUE))
+	if err != nil {
+		return nil, err
+	}
+	defer regKey.Close()
+
+	val, _, err := regKey.GetBinaryValue(regValWBCL)
+	if err != nil {
+		return nil, err
+	}
+
+	newBuf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(newBuf, uint32(len(val)))
+	val = append(newBuf, val...)
+
+	return val, nil
+}
+
 func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 	// try to get all current WBCL logs from on-disk location first
 	// this is more reliable than getAllTCGLogs() and more complete than GetTCGLog()
 	logs, err := getAllWBCLLogsFromDisk()
 	if err != nil {
 		logrus.Debugf("srtmlog.getAllWBCLLogsFromDisk(): failed to get WBCLs from disk, falling back to API: %v", err)
+
 		// try to use API functions as fallback
 		logs, err = readTPM2EventLogWinApi(conn)
 		if err != nil {
-			return nil, err
+			logrus.Debugf("srtmlog.readTPM2EventLogWinApi(): failed to get WBCLs from API, falling back to registry key: %v", err)
+
+			// try getting current WBCL from registry as fallback
+			return readTPM2EventLogRegistry()
 		}
 	}
 
