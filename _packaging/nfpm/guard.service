@@ -1,0 +1,13 @@
+[Unit]
+Description=This unit will start the immune Guard agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Restart=no
+Type=oneshot
+WorkingDirectory=/var/lib/immune-guard
+ExecStart=/usr/bin/guard attest
+
+[Install]
+WantedBy=basic.target
