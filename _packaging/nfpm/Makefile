@@ -14,7 +14,7 @@ TARGETS:=guard_1-$(RELEASE_ID).1_amd64.deb guard-1-$(RELEASE_ID)-1.x86_64.rpm
 .PHONY: deps
 deps:
 	@echo "Fetching and installing dependencies.."
-	@$(GO) install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.6.0
+	@$(GO) install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.19.2
 
 # suppress lots of legacy SCCS and RCS lookups
 MAKEFLAGS += --no-builtin-rules
