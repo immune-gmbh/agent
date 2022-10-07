@@ -1,0 +1,8 @@
+[Unit]
+Description=immune Guard agent timer
+
+[Timer]
+OnUnitActiveSec=60m
+
+[Install]
+WantedBy=timers.target

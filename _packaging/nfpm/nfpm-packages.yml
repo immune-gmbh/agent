@@ -1,0 +1,40 @@
+#
+# check https://nfpm.goreleaser.com/configuration for detailed usage
+#
+name: "immune-guard"
+arch: "amd64"
+platform: "linux"
+version: "1-${RELEASE_ID}"
+version_schema: "none"
+section: "default"
+priority: "extra"
+maintainer: "Kai Michaelis <kai.michaelis@immu.ne>"
+description: |
+  Remote attestation and firmware security monitoring for servers.
+vendor: "immune GmbH"
+homepage: "https://github.com/immune-gmbh/guard"
+license: "MIT"
+
+contents:
+  - src: ./guard-linux
+    dst: /usr/bin/guard
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  - src: ./guard.service
+    dst: /etc/systemd/system/guard.service
+    type: config
+  - src: ./guard.timer
+    dst: /etc/systemd/system/guard.timer
+    type: config
+
+overrides:
+  rpm:
+    scripts:
+      postinstall: ./postinstall.sh
+      postremove: ./postremove.sh
+  deb:
+    scripts:
+      postinstall: ./postinstall.sh
+      postremove: ./postremove.sh
