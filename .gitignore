@@ -5,3 +5,8 @@
 /guard-*
 /cmd/*.syso
 /coverage.*
+
+# package build artifacts
+/_packaging/**/*.deb
+/_packaging/**/*.rpm
+/_packaging/**/*.msi
