@@ -7,7 +7,7 @@ jobs:
     strategy:
       matrix:
         sys:
-          - { os: ubuntu-18.04 }
+          - { os: ubuntu-22.04 }
           - { os: windows-2019 }
     env:
       OS: ${{ matrix.sys.os }}
