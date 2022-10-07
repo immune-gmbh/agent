@@ -10,13 +10,13 @@ jobs:
     timeout-minutes: 5
     runs-on: ubuntu-20.04
     outputs:
-      doit: ${{ steps.git-diff.outputs.diff != '' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/r')) }}
+      doit: ${{ steps.git-diff.outputs.diff != '' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) }}
     steps:
       - uses: actions/checkout@v3
-        if: ${{ github.event_name != 'push' && !startsWith(github.ref, 'refs/tags/r') }}
+        if: ${{ github.event_name != 'push' && !startsWith(github.ref, 'refs/tags/v') }}
 
       - uses: technote-space/get-diff-action@v5
-        if: ${{ github.event_name != 'push' && !startsWith(github.ref, 'refs/tags/r') }}
+        if: ${{ github.event_name != 'push' && !startsWith(github.ref, 'refs/tags/v') }}
         id: git-diff
         with:
           PATTERNS: |
@@ -26,10 +26,10 @@ jobs:
           echo "${{ steps.git-diff.outputs.diff }}"
           echo "${{ steps.git-diff.outputs.diff == '' }}"
           echo "${{ github.event_name == 'push' }}"
-          echo "${{ startsWith(github.ref, 'refs/tags/r') }}"
+          echo "${{ startsWith(github.ref, 'refs/tags/v') }}"
           echo "${{ github.ref }}"
           echo "${{ github.event_name }}"
-          echo "${{ steps.git-diff.outputs.diff != '' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/r')) }}"
+          echo "${{ steps.git-diff.outputs.diff != '' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) }}"
 
 
   agent:
