@@ -31,6 +31,11 @@ var (
 	PaymentError = errors.New("Payment required")
 )
 
+func errIsClientSide(err error) bool {
+	// client side errors do not retry requests
+	return errors.Is(err, FormatError) || errors.Is(err, AuthError) || errors.Is(err, PaymentError)
+}
+
 func Cookie(rng io.Reader) (string, error) {
 	buf := make([]byte, 32)
 	if l, err := rng.Read(buf); err != nil {
@@ -201,7 +206,7 @@ func (c *Client) Post(ctx context.Context, route string, doc interface{}) (jsona
 		defer cancel()
 		ev, err = c.doPost(ctx, route, doc)
 
-		if err == nil || errors.Is(err, FormatError) || errors.Is(err, AuthError) {
+		if err == nil || errIsClientSide(err) {
 			return ev, err
 		}
 	}
@@ -222,7 +227,7 @@ func (c *Client) Get(ctx context.Context, route string, ifModifiedSince *time.Ti
 		defer cancel()
 		ev, err = c.doGet(ctx, route, ifModifiedSince)
 
-		if err == nil || errors.Is(err, FormatError) || errors.Is(err, AuthError) {
+		if err == nil || errIsClientSide(err) {
 			return ev, err
 		}
 	}
