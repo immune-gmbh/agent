@@ -42,6 +42,11 @@ jobs:
       run:
         working-directory: ./
     steps:
+
+###########
+########### PREREQUISITES
+###########
+
       - uses: actions/checkout@v3
         if: ${{ needs.preflight.outputs.doit == 'true' }}
         with:
@@ -52,7 +57,7 @@ jobs:
         if: ${{ needs.preflight.outputs.doit == 'true' }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y s3fs gnupg-pkcs11-scd openvpn openvpn-systemd-resolved dpkg-sig rpm
+          sudo apt-get install -y s3fs gnupg-pkcs11-scd openvpn openvpn-systemd-resolved dpkg-sig rpm createrepo-c
 
       - name: Install Go
         uses: actions/setup-go@v2
@@ -76,6 +81,15 @@ jobs:
           key: ${{ runner.os }}-agent-${{ hashFiles('agent/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-agent-
+
+      - name: Install aptly from source
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        run: |
+          go install github.com/aptly-dev/aptly@v1.5.0
+
+###########
+########### BUILD
+###########
 
       - name: Setup action variables
         if: ${{ needs.preflight.outputs.doit == 'true' }}
@@ -197,12 +211,7 @@ jobs:
 ########### HERE COMES THE APT REPO 
 ###########
 
-      - name: Install aptly from source
-        if: ${{ needs.preflight.outputs.doit == 'true' }}
-        run: |
-          go install github.com/aptly-dev/aptly@v1.5.0
-
-      - name: Mount s3fs
+      - name: Mount private repo state s3fs
         if: ${{ needs.preflight.outputs.doit == 'true' }}
         shell: bash
         env:
@@ -228,3 +237,38 @@ jobs:
         run: |
           aptly -config ./repo-state/aptly.conf repo add agent-release ./agent-binaries/*.deb
           aptly -config ./repo-state/aptly.conf publish update stable s3:debian-edge:
+          sync
+          umount repo-state
+
+###########
+########### HERE COMES THE RPM REPO 
+###########
+
+      - name: Mount package registry s3fs
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        shell: bash
+        env:
+          DO_SPACE: package-registry
+        run: |
+          # password setup has already been done by APT repo steps above
+          mkdir live-repo
+          s3fs $DO_SPACE $PWD/live-repo \
+            -o passwd_file=$PWD/passwd-s3fs \
+            -o url=https://fra1.digitaloceanspaces.com/ \
+            -o use_path_request_style \
+            -o default_acl=public-read \
+            -o uid=$UID
+
+      - name: Release packages to RPM repo
+        if: ${{ needs.preflight.outputs.doit == 'true' && github.event_name == 'push' && startsWith(steps.locals.outputs.release_id, 'v') }}
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.DO_ACCESS_KEY}}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_SECRET_KEY }}
+          REPOPATH: live-repo/rpmrepo/edge
+        run: |
+          cp ./agent-binaries/*.rpm ${PWD}/${REPOPATH}
+          createrepo_c --update ${PWD}/${REPOPATH}
+          gpg --detach-sign --armor ${PWD}/${REPOPATH}/repodata/repomd.xml
+          sync
+          umount live-repo
