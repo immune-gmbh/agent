@@ -48,7 +48,14 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - uses: actions/setup-go@v2
+      - name: Install programs
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y s3fs gnupg-pkcs11-scd openvpn openvpn-systemd-resolved dpkg-sig rpm
+
+      - name: Install Go
+        uses: actions/setup-go@v2
         if: ${{ needs.preflight.outputs.doit == 'true' }}
         with:
           go-version: '1.19'
@@ -100,26 +107,10 @@ jobs:
           cp ./_packaging/nfpm/guard-1*.rpm ./agent-binaries
           cp ./_packaging/nfpm/guard_1*.deb ./agent-binaries
 
-      - uses: BetaHuhn/do-spaces-action@v2
-        if: ${{ needs.preflight.outputs.doit == 'true' && github.event_name == 'push' && startsWith(steps.locals.outputs.release_id, 'v') }}
-        with:
-          access_key: ${{ secrets.DO_ACCESS_KEY}}
-          secret_key: ${{ secrets.DO_SECRET_KEY }}
-          space_name: "package-registry"
-          space_region: "fra1"
-          source: ./agent-binaries
-          out_dir: ${{ steps.locals.outputs.release_id }}
-
 ###########
-########### HERE COMES THE APT REPO 
+########### HERE COMES THE GPG <-> PCKS11 <-> HSM setup
 ###########
 
-      - name: Install programs
-        if: ${{ needs.preflight.outputs.doit == 'true' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y s3fs gnupg-pkcs11-scd openvpn openvpn-systemd-resolved
-          go install github.com/aptly-dev/aptly@v1.5.0
       - name: Install YubiHSM pkcs11 libraries
         if: ${{ needs.preflight.outputs.doit == 'true' }}
         shell: bash
@@ -130,6 +121,7 @@ jobs:
           cd yubihsm2-sdk
           sudo dpkg -i libyubihsm-http1_2.3.2_amd64.deb libyubihsm1_2.3.2_amd64.deb yubihsm-pkcs11_2.3.2_amd64.deb
           go install github.com/aptly-dev/aptly@v1.5.0
+
       - name: Write GPG <-> PCKS11 <-> HSM configurations
         if: ${{ needs.preflight.outputs.doit == 'true' }}
         env:
@@ -146,23 +138,7 @@ jobs:
           echo "provider-yubihsm-cert-private" >> ~/.gnupg/gnupg-pkcs11-scd.conf
           gpg-connect-agent RELOADAGENT /bye
           echo "$OVPN_HSM_CFG" > hsm.ovpn
-      - name: Mount s3fs
-        if: ${{ needs.preflight.outputs.doit == 'true' }}
-        shell: bash
-        env:
-          DO_ACCESS_KEY: ${{ secrets.DO_ACCESS_KEY}}
-          DO_SECRET_KEY: ${{ secrets.DO_SECRET_KEY }}
-          DO_SPACE: pkg-repo-state
-        run: |
-          touch passwd-s3fs
-          chmod 0600 passwd-s3fs
-          echo "$DO_ACCESS_KEY:$DO_SECRET_KEY" > passwd-s3fs
-          mkdir repo-state
-          s3fs $DO_SPACE $PWD/repo-state \
-            -o passwd_file=$PWD/passwd-s3fs \
-            -o url=https://fra1.digitaloceanspaces.com/ \
-            -o use_path_request_style \
-            -o uid=$UID
+
       - name: Connect to VPN
         if: ${{ needs.preflight.outputs.doit == 'true' }}
         uses: "kota65535/github-openvpn-connect-action@v2"
@@ -170,6 +146,7 @@ jobs:
           config_file: hsm.ovpn
           username: ${{ secrets.OVPN_HSM_UNAME }}
           password: ${{ secrets.OVPN_HSM_PWORD }}
+
       - name: Import and activate repo signing key
         if: ${{ needs.preflight.outputs.doit == 'true' }}
         env:
@@ -193,6 +170,56 @@ jobs:
           gpg --list-packets <repo-signing.key |
           awk '$1=="keyid:"{print$2;exit}')" trust 
           echo cache_passphrase_now | gpg --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --sign > /dev/null
+
+###########
+########### HERE COMES STANDALONE PACKAGE SIGNING AND UPLOAD (THE MORE COMMON REPO SIGNING IS SOMETHING ELSE)
+###########
+
+      - name: Sign DEB and RPM
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        run: |
+          dpkg-sig -s cibuilder ./agent-binaries/*.deb
+          echo "%_signature gpg" > ~/.rpmmacros
+          echo "%_gpg_name $(gpg --list-packets <repo-signing.key | awk '$1=="keyid:"{print$2;exit}')" > ~/.rpmmacros
+          rpm --addsign ./agent-binaries/*.rpm
+
+      - uses: BetaHuhn/do-spaces-action@v2
+        if: ${{ needs.preflight.outputs.doit == 'true' && github.event_name == 'push' && startsWith(steps.locals.outputs.release_id, 'v') }}
+        with:
+          access_key: ${{ secrets.DO_ACCESS_KEY}}
+          secret_key: ${{ secrets.DO_SECRET_KEY }}
+          space_name: "package-registry"
+          space_region: "fra1"
+          source: ./agent-binaries
+          out_dir: ${{ steps.locals.outputs.release_id }}
+
+###########
+########### HERE COMES THE APT REPO 
+###########
+
+      - name: Install aptly from source
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        run: |
+          go install github.com/aptly-dev/aptly@v1.5.0
+
+      - name: Mount s3fs
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        shell: bash
+        env:
+          DO_ACCESS_KEY: ${{ secrets.DO_ACCESS_KEY}}
+          DO_SECRET_KEY: ${{ secrets.DO_SECRET_KEY }}
+          DO_SPACE: pkg-repo-state
+        run: |
+          touch passwd-s3fs
+          chmod 0600 passwd-s3fs
+          echo "$DO_ACCESS_KEY:$DO_SECRET_KEY" > passwd-s3fs
+          mkdir repo-state
+          s3fs $DO_SPACE $PWD/repo-state \
+            -o passwd_file=$PWD/passwd-s3fs \
+            -o url=https://fra1.digitaloceanspaces.com/ \
+            -o use_path_request_style \
+            -o uid=$UID
+
       - name: Release packages to APT repo
         if: ${{ needs.preflight.outputs.doit == 'true' && github.event_name == 'push' && startsWith(steps.locals.outputs.release_id, 'v') }}
         env:
