@@ -263,8 +263,6 @@ jobs:
         if: ${{ needs.preflight.outputs.doit == 'true' && github.event_name == 'push' && startsWith(steps.locals.outputs.release_id, 'v') }}
         shell: bash
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.DO_ACCESS_KEY}}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_SECRET_KEY }}
           REPOPATH: live-repo/rpmrepo/edge
         run: |
           cp ./agent-binaries/*.rpm ${PWD}/${REPOPATH}
