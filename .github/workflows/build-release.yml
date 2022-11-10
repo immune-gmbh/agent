@@ -8,7 +8,7 @@ on:
 jobs:
   preflight:
     timeout-minutes: 5
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       doit: ${{ steps.git-diff.outputs.diff != '' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) }}
     steps:
@@ -108,3 +108,95 @@ jobs:
           space_region: "fra1"
           source: ./agent-binaries
           out_dir: ${{ steps.locals.outputs.release_id }}
+
+###########
+########### HERE COMES THE APT REPO 
+###########
+
+      - name: Install programs
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y s3fs gnupg-pkcs11-scd openvpn openvpn-systemd-resolved
+          go install github.com/aptly-dev/aptly@v1.5.0
+      - name: Install YubiHSM pkcs11 libraries
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        shell: bash
+        run: |
+          test -f /usr/lib/x86_64-linux-gnu/pkcs11/yubihsm_pkcs11.so && exit 0
+          wget https://developers.yubico.com/YubiHSM2/Releases/yubihsm2-sdk-2022-06-ubuntu2204-amd64.tar.gz
+          tar -xzf yubihsm2-sdk-2022-06-ubuntu2204-amd64.tar.gz
+          cd yubihsm2-sdk
+          sudo dpkg -i libyubihsm-http1_2.3.2_amd64.deb libyubihsm1_2.3.2_amd64.deb yubihsm-pkcs11_2.3.2_amd64.deb
+          go install github.com/aptly-dev/aptly@v1.5.0
+      - name: Write GPG <-> PCKS11 <-> HSM configurations
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        env:
+          CONNECTOR: ${{ secrets.HSM2_CONNECTOR}}
+          OVPN_HSM_CFG: ${{ secrets.OVPN_HSM_CFG}}
+        shell: bash
+        run: |
+          mkdir ~/.gnupg
+          chmod 0700 ~/.gnupg
+          echo "connector=$CONNECTOR" > ~/yubihsm_pkcs11.conf
+          echo "scdaemon-program /usr/bin/gnupg-pkcs11-scd" > ~/.gnupg/gpg-agent.conf
+          echo "providers yubihsm" >> ~/.gnupg/gnupg-pkcs11-scd.conf 
+          echo "provider-yubihsm-library /usr/lib/x86_64-linux-gnu/pkcs11/yubihsm_pkcs11.so" >> ~/.gnupg/gnupg-pkcs11-scd.conf 
+          echo "provider-yubihsm-cert-private" >> ~/.gnupg/gnupg-pkcs11-scd.conf
+          gpg-connect-agent RELOADAGENT /bye
+          echo "$OVPN_HSM_CFG" > hsm.ovpn
+      - name: Mount s3fs
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        shell: bash
+        env:
+          DO_ACCESS_KEY: ${{ secrets.DO_ACCESS_KEY}}
+          DO_SECRET_KEY: ${{ secrets.DO_SECRET_KEY }}
+          DO_SPACE: pkg-repo-state
+        run: |
+          touch passwd-s3fs
+          chmod 0600 passwd-s3fs
+          echo "$DO_ACCESS_KEY:$DO_SECRET_KEY" > passwd-s3fs
+          mkdir repo-state
+          s3fs $DO_SPACE $PWD/repo-state \
+            -o passwd_file=$PWD/passwd-s3fs \
+            -o url=https://fra1.digitaloceanspaces.com/ \
+            -o use_path_request_style \
+            -o uid=$UID
+      - name: Connect to VPN
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        uses: "kota65535/github-openvpn-connect-action@v2"
+        with:
+          config_file: hsm.ovpn
+          username: ${{ secrets.OVPN_HSM_UNAME }}
+          password: ${{ secrets.OVPN_HSM_PWORD }}
+      - name: Import and activate repo signing key
+        if: ${{ needs.preflight.outputs.doit == 'true' }}
+        env:
+          REPOKEY: ${{ secrets.REPO_SIGNING_KEY }}
+          PKSHADOW: ${{ secrets.REPO_SIGNING_PKSHADOW }}
+          KEYGRIP: ${{ secrets.REPO_SIGNING_PKGRIP }}
+          GPG_PASSPHRASE: ${{ secrets.HSM2_AUTH }}
+        run: |
+          echo "$REPOKEY" > repo-signing.key
+          gpg --import - < repo-signing.key
+          # if you are missing the file below, set-up gpg with hsm on your local machine
+          # like in this script and import the key. then we need to run gpg --card-status
+          # to re-create the shadowed PK. this requires a pin entry which gpg does not support
+          # at this point. to work around this use gpg-connect-agent and issue the SCD LEARN
+          # command which will present you with a pin prompt. it has to be the first thing
+          # you do and it will establish a session with the HSM that is re-used when running
+          # gpg --card-status.
+          echo "$PKSHADOW" > ~/.gnupg/private-keys-v1.d/$KEYGRIP
+          (echo 5; echo y; echo save) |
+          gpg --command-fd 0 --no-tty --no-greeting -q --edit-key "$(
+          gpg --list-packets <repo-signing.key |
+          awk '$1=="keyid:"{print$2;exit}')" trust 
+          echo cache_passphrase_now | gpg --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --sign > /dev/null
+      - name: Release packages to APT repo
+        if: ${{ needs.preflight.outputs.doit == 'true' && github.event_name == 'push' && startsWith(steps.locals.outputs.release_id, 'v') }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.DO_ACCESS_KEY}}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_SECRET_KEY }}
+        run: |
+          aptly -config ./repo-state/aptly.conf repo add agent-release ./agent-binaries/*.deb
+          aptly -config ./repo-state/aptly.conf publish update stable s3:debian-edge:
