@@ -1,4 +1,5 @@
 name: Build release
+concurrency: repo-state-aptly
 on:
   push:
     tags:
