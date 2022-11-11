@@ -12,7 +12,7 @@ maintainer: "Kai Michaelis <kai.michaelis@immu.ne>"
 description: |
   Remote attestation and firmware security monitoring for servers.
 vendor: "immune GmbH"
-homepage: "https://github.com/immune-gmbh/guard"
+homepage: "https://github.com/immune-gmbh/agent"
 license: "MIT"
 
 contents:
