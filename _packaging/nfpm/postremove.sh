@@ -3,7 +3,7 @@
 remove() {
   systemctl disable --now guard.timer ||: &> /dev/null
   systemctl disable guard.service ||: &> /dev/null
-  echo hello
+
 }
 
 action="$1"
