@@ -95,11 +95,13 @@ type HashBlob struct {
 }
 
 type Devices struct {
-	FWUPdVersion string        `json:"fwupd_version"`
-	Topology     []FWUPdDevice `json:"topology"`
+	FWUPdVersion string                        `json:"fwupd_version"`
+	Topology     []FWUPdDevice                 `json:"topology"`
+	Releases     map[string][]FWUPdReleaseInfo `json:"releases,omitempty"`
 }
 
 type FWUPdDevice = map[string]interface{}
+type FWUPdReleaseInfo = map[string]interface{}
 
 type Agent struct {
 	Release   string      `json:"release"`
