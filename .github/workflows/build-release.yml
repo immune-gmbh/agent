@@ -235,9 +235,11 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DO_ACCESS_KEY}}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_SECRET_KEY }}
+          RELEASE_ID: ${{ steps.locals.outputs.release_id }}
         run: |
           aptly -config ./repo-state/aptly.conf repo add agent-release ./agent-binaries/*.deb
           aptly -config ./repo-state/aptly.conf publish update stable s3:debian-edge:
+          aptly -config ./repo-state/aptly.conf snapshot create "agent-release-$RELEASE_ID" from repo agent-release
           sync
           umount repo-state
 
@@ -269,6 +271,6 @@ jobs:
         run: |
           cp ./agent-binaries/*.rpm ${PWD}/${REPOPATH}
           createrepo_c --update ${PWD}/${REPOPATH}
-          gpg --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --detach-sign --armor ${PWD}/${REPOPATH}/repodata/repomd.xml
+          gpg --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --yes --detach-sign --armor ${PWD}/${REPOPATH}/repodata/repomd.xml
           sync
           umount live-repo
