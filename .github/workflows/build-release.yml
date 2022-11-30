@@ -147,6 +147,7 @@ jobs:
           chmod 0700 ~/.gnupg
           echo "connector=$CONNECTOR" > ~/yubihsm_pkcs11.conf
           echo "scdaemon-program /usr/bin/gnupg-pkcs11-scd" > ~/.gnupg/gpg-agent.conf
+          echo "default-cache-ttl 46000" >> ~/.gnupg/gpg-agent.conf
           echo "providers yubihsm" >> ~/.gnupg/gnupg-pkcs11-scd.conf 
           echo "provider-yubihsm-library /usr/lib/x86_64-linux-gnu/pkcs11/yubihsm_pkcs11.so" >> ~/.gnupg/gnupg-pkcs11-scd.conf 
           echo "provider-yubihsm-cert-private" >> ~/.gnupg/gnupg-pkcs11-scd.conf
@@ -264,9 +265,10 @@ jobs:
         shell: bash
         env:
           REPOPATH: live-repo/rpmrepo/edge
+          GPG_PASSPHRASE: ${{ secrets.HSM2_AUTH }}
         run: |
           cp ./agent-binaries/*.rpm ${PWD}/${REPOPATH}
           createrepo_c --update ${PWD}/${REPOPATH}
-          gpg --detach-sign --armor ${PWD}/${REPOPATH}/repodata/repomd.xml
+          gpg --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --detach-sign --armor ${PWD}/${REPOPATH}/repodata/repomd.xml
           sync
           umount live-repo
