@@ -2,4 +2,6 @@
 
 package immunecpu
 
-func StopDriver() {}
+func CreateService() error { return nil }
+func RemoveService() error { return nil }
+func StopDriver() error    { return nil }

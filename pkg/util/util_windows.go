@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"syscall"
+	"unicode/utf16"
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
@@ -80,6 +81,81 @@ func IsRoot() (bool, error) {
 	return member, nil
 }
 
+// from golang stdlib
+func toPtr(s string) *uint16 {
+	if len(s) == 0 {
+		return nil
+	}
+	return syscall.StringToUTF16Ptr(s)
+}
+
+// from golang stdlib
+// toStringBlock terminates strings in ss with 0, and then
+// concatenates them together. It also adds extra 0 at the end.
+func toStringBlock(ss []string) *uint16 {
+	if len(ss) == 0 {
+		return nil
+	}
+	t := ""
+	for _, s := range ss {
+		if s != "" {
+			t += s + "\x00"
+		}
+	}
+	if t == "" {
+		return nil
+	}
+	t += "\x00"
+	return &utf16.Encode([]rune(t))[0]
+}
+
+func CreateDriverService(driverName, displayName, driverPath string) error {
+	svcmgr, err := mgr.Connect()
+	if err != nil {
+		return err
+	}
+	defer svcmgr.Disconnect()
+
+	cfg := mgr.Config{}
+	cfg.StartType = mgr.StartManual
+	cfg.DisplayName = displayName
+	cfg.ServiceType = windows.SERVICE_KERNEL_DRIVER
+
+	// call this directly to bypass broken escaping of module path
+	h, err := windows.CreateService(svcmgr.Handle, toPtr(driverName), toPtr(cfg.DisplayName),
+		windows.SERVICE_ALL_ACCESS, cfg.ServiceType,
+		cfg.StartType, cfg.ErrorControl, toPtr(driverPath), toPtr(cfg.LoadOrderGroup),
+		nil, toStringBlock(cfg.Dependencies), toPtr(cfg.ServiceStartName), toPtr(cfg.Password))
+	if err != nil {
+		return err
+	}
+	sv := mgr.Service{Name: driverName, Handle: h}
+	sv.Close()
+
+	return err
+}
+
+func DeleteDriverService(driverName string) error {
+	svcmgr, err := mgr.Connect()
+	if err != nil {
+		return err
+	}
+	defer svcmgr.Disconnect()
+
+	sv, err := svcmgr.OpenService(driverName)
+	if err != nil {
+		return err
+	}
+	defer sv.Close()
+
+	err = sv.Delete()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func StartDriverIfNotRunning(driverName string) error {
 	svcmgr, err := mgr.Connect()
 	if err != nil {
@@ -119,6 +195,10 @@ func StopDriver(driverName string) error {
 
 	sv, err := svcmgr.OpenService(driverName)
 	if err != nil {
+		if errnoErr, ok := err.(syscall.Errno); ok && errnoErr == 0x424 {
+			// service not found, that's okay just swallow it
+			return nil
+		}
 		return err
 	}
 	defer sv.Close()
