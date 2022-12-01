@@ -237,7 +237,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_SECRET_KEY }}
           RELEASE_ID: ${{ steps.locals.outputs.release_id }}
         run: |
-          aptly -config ./repo-state/aptly.conf repo add agent-release ./agent-binaries/*.deb
+          aptly -config ./repo-state/aptly.conf repo add -force-replace agent-release ./agent-binaries/*.deb
           aptly -config ./repo-state/aptly.conf publish update stable s3:debian-edge:
           aptly -config ./repo-state/aptly.conf snapshot create "agent-release-$RELEASE_ID" from repo agent-release
           sync
