@@ -50,6 +50,18 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	// this is a no-op on non-windows systems
 	immunecpu.StopDriver()
 
+	// re-create cpu driver service
+	// service must be stopped or it will just be marked for deletion
+	immunecpu.RemoveService()
+	err = immunecpu.CreateService()
+	if err != nil {
+		logrus.Debugf("immunecpu.CreateService(): %s", err.Error())
+		logrus.Warnf("Failed to install immune Guard reporting driver")
+	}
+
+	// clean up every time
+	defer immunecpu.RemoveService()
+
 	// also stop the driver when leaving
 	defer immunecpu.StopDriver()
 

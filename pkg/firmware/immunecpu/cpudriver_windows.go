@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"syscall"
 
 	"github.com/immune-gmbh/agent/v3/pkg/util"
@@ -13,17 +15,50 @@ import (
 
 const (
 	DriverServiceName string = "immuneCPU"
+	DriverDisplayName string = "immune Guard driver"
+	DriverFileName    string = "Drivers\\immune\\immune.sys"
 	DriverDeviceFile  string = "\\\\?\\GLOBALROOT\\Device\\immuneCPU"
 	IOCTL_GETFLASH    uint32 = (0x8000 << 16) | 1<<14 | (0x800 << 2) | 2
 	IOCTL_GETMSR      uint32 = (0x8000 << 16) | 3<<14 | (0x802 << 2)
 	IOCTL_GETTXTPUB   uint32 = (0x8000 << 16) | 1<<14 | (0x804 << 2) | 2
 )
 
-func StopDriver() {
+/*
+
+SERVICE_NAME: immunecpu
+        TYPE               : 1  KERNEL_DRIVER
+        STATE              : 4  RUNNING
+                                (STOPPABLE, NOT_PAUSABLE, IGNORES_SHUTDOWN)
+        WIN32_EXIT_CODE    : 0  (0x0)
+        SERVICE_EXIT_CODE  : 0  (0x0)
+        CHECKPOINT         : 0x0
+        WAIT_HINT          : 0x0
+
+*/
+
+func CreateService() error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	driverPath := "\\??\\" + filepath.Join(cwd, DriverFileName)
+	return util.CreateDriverService(DriverServiceName, DriverDisplayName, driverPath)
+}
+
+func RemoveService() error {
+	err := util.DeleteDriverService(DriverServiceName)
+	if err != nil {
+		logrus.Debugf("failed removing immuneCPU: %s", err)
+	}
+	return err
+}
+
+func StopDriver() error {
 	err := util.StopDriver(DriverServiceName)
 	if err != nil {
-		logrus.Debugf("failed stopping immuneCPU for forced reload: %s", err)
+		logrus.Debugf("failed stopping immuneCPU: %s", err)
 	}
+	return err
 }
 
 func loadDriver() (handle windows.Handle, err error) {
