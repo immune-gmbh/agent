@@ -53,7 +53,7 @@ func WinAddTokenPrivilege(name string) error {
 }
 
 func IsKernelModuleLoaded(name string) (bool, error) {
-	return false, errors.New("IsRoot not implemented on " + runtime.GOOS)
+	return false, errors.New("IsKernelModuleLoaded not implemented on " + runtime.GOOS)
 }
 
 func IsRoot() (bool, error) {
@@ -122,6 +122,15 @@ func StopDriver(driverName string) error {
 		return err
 	}
 	defer sv.Close()
+
+	status, err := sv.Query()
+	if err != nil {
+		return err
+	}
+
+	if status.State == svc.Stopped {
+		return nil
+	}
 
 	_, err = sv.Control(svc.Stop)
 	if err != nil {

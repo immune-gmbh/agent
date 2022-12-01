@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/immune-gmbh/agent/v3/pkg/util"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 )
 
@@ -18,12 +19,18 @@ const (
 	IOCTL_GETTXTPUB   uint32 = (0x8000 << 16) | 1<<14 | (0x804 << 2) | 2
 )
 
+func StopDriver() {
+	err := util.StopDriver(DriverServiceName)
+	if err != nil {
+		logrus.Debugf("failed stopping immuneCPU for forced reload: %s", err)
+	}
+}
+
 func loadDriver() (handle windows.Handle, err error) {
 	err = util.StartDriverIfNotRunning(DriverServiceName)
 	if err != nil {
 		return
 	}
-	defer util.StopDriver(DriverServiceName)
 
 	u16fname, err := syscall.UTF16FromString(DriverDeviceFile)
 	if err != nil {

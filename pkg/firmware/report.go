@@ -15,6 +15,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/epp"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/fwupd"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/heci"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware/immunecpu"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/msr"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/netif"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/osinfo"
@@ -44,6 +45,13 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 		logrus.Debugf("util.WinAddTokenPrivilege(): %s", err.Error())
 		logrus.Warnf("Failed to get windows security permissions to read UEFI variables")
 	}
+
+	// stop cpu driver once before it is used to ensure we always load a fresh version
+	// this is a no-op on non-windows systems
+	immunecpu.StopDriver()
+
+	// also stop the driver when leaving
+	defer immunecpu.StopDriver()
 
 	// Basic Input/Output System flash
 	biosflash.ReportBiosFlash(&fwData.Flash)
