@@ -1,8 +1,7 @@
 package pci
 
-import "github.com/immune-gmbh/agent/v3/pkg/firmware/immunepci"
-
 // readConfigSpace is just a wrapper to keep things consistent
 func readConfigSpace(bus, device, function, offset, maxcount uint32) (outBuf []byte, err error) {
-	return immunepci.ReadConfigSpace(bus, device, function, offset, maxcount)
+	// currently not implemented, trying to move functionality into non-pnp driver
+	return nil, nil
 }
