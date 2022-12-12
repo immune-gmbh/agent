@@ -75,8 +75,9 @@ type rootCmd struct {
 	Colors   bool        `help:"Force colors on for all console outputs (default: autodetect)"`
 
 	// Subcommands
-	Attest attestCmd `cmd:"" help:"Attests platform integrity of device"`
-	Enroll enrollCmd `cmd:"" help:"Enrolls device at the immune SaaS backend"`
+	Attest  attestCmd  `cmd:"" help:"Attests platform integrity of device"`
+	Enroll  enrollCmd  `cmd:"" help:"Enrolls device at the immune SaaS backend"`
+	Collect collectCmd `cmd:"" help:"Only collect firmware data"`
 }
 
 type enrollCmd struct {
@@ -85,6 +86,9 @@ type enrollCmd struct {
 	Name     string `arg:"" optional:"" name:"name hint" help:"Name to assign to the device. May get suffixed by a counter if already taken. Defaults to the hostname."`
 	TPM      string `name:"tpm" default:"${tpm_default_path}" help:"TPM device: device path (${tpm_default_path}) or mssim, sgx, swtpm/net url (mssim://localhost, sgx://localhost, net://localhost:1234) or 'dummy' for dummy TPM"`
 	DummyTPM bool   `name:"notpm" help:"Force using insecure dummy TPM if this device has no real TPM" default:"false"`
+}
+
+type collectCmd struct {
 }
 
 type attestCmd struct {
@@ -146,6 +150,20 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 	}
 
 	return doAttest(glob, ctx, "", false)
+}
+
+func (collect *collectCmd) Run(glob *globalOptions) error {
+	ctx := context.Background()
+	cfg := api.Configuration{}
+
+	err := attestation.Collect(ctx, &cfg)
+	if err != nil {
+		tui.SetUIState(tui.StAttestationFailed)
+		return err
+	}
+
+	tui.SetUIState(tui.StAttestationSuccess)
+	return nil
 }
 
 func (attest *attestCmd) Run(glob *globalOptions) error {
@@ -289,18 +307,19 @@ func run() int {
 	if err := initState(cli.StateDir, &glob); err != nil {
 		logrus.Error("Cannot restore state")
 		tui.DumpErr()
-		return 1
-	}
+		//return 1
+	} else {
 
-	if err := initClient(&glob); err != nil {
-		tui.DumpErr()
-		return 1
-	}
+		if err := initClient(&glob); err != nil {
+			tui.DumpErr()
+			return 1
+		}
 
-	// be sure to run this after we have a client
-	if err := updateConfig(&glob); err != nil {
-		tui.DumpErr()
-		return 1
+		// be sure to run this after we have a client
+		if err := updateConfig(&glob); err != nil {
+			tui.DumpErr()
+			return 1
+		}
 	}
 
 	// Run the selected subcommand
@@ -429,7 +448,7 @@ func initClient(glob *globalOptions) error {
 	var server *url.URL
 	if cli.Server != nil {
 		server = cli.Server
-	} else if glob.State.ServerURL != nil {
+	} else if glob.State != nil && glob.State.ServerURL != nil {
 		server = glob.State.ServerURL
 	} else {
 		var err error
