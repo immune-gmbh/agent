@@ -47,6 +47,12 @@ func (s *State) EnsureFresh(cl *api.Client) (bool, error) {
 
 	cfg, err := cl.Configuration(ctx, &s.LastUpdate)
 	if err != nil {
+		// if the server is not reachable we can try to re-use an old config if there was any
+		// the firmware reporting functionality must be able to run with empty
+		// configs
+		if errors.Is(err, api.ServerError) {
+			return false, nil
+		}
 		return false, err
 	}
 
