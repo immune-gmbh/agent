@@ -307,19 +307,18 @@ func run() int {
 	if err := initState(cli.StateDir, &glob); err != nil {
 		logrus.Error("Cannot restore state")
 		tui.DumpErr()
-		//return 1
-	} else {
+		return 1
+	}
 
-		if err := initClient(&glob); err != nil {
-			tui.DumpErr()
-			return 1
-		}
+	if err := initClient(&glob); err != nil {
+		tui.DumpErr()
+		return 1
+	}
 
-		// be sure to run this after we have a client
-		if err := updateConfig(&glob); err != nil {
-			tui.DumpErr()
-			return 1
-		}
+	// be sure to run this after we have a client
+	if err := updateConfig(&glob); err != nil {
+		tui.DumpErr()
+		return 1
 	}
 
 	// Run the selected subcommand
@@ -336,6 +335,7 @@ func updateConfig(glob *globalOptions) error {
 	update, err := glob.State.EnsureFresh(&glob.Client)
 	if err != nil {
 		logrus.Debugf("Fetching fresh config: %s", err)
+		logrus.Error("Failed to load configuration from server")
 		return err
 	}
 
