@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/immune-gmbh/agent/v3/pkg/attestation"
+	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
@@ -19,7 +20,7 @@ type enrollCmd struct {
 	DummyTPM bool   `name:"notpm" help:"Force using insecure dummy TPM if this device has no real TPM" default:"false"`
 }
 
-func (enroll *enrollCmd) Run(glob *globalOptions) error {
+func (enroll *enrollCmd) Run(glob *core.GlobalOptions) error {
 	ctx := context.Background()
 
 	// store used TPM in state, use dummy TPM only if forced
@@ -29,7 +30,7 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 		glob.State.TPM = enroll.TPM
 	}
 
-	if err := openTPM(glob); err != nil {
+	if err := core.OpenTPM(glob); err != nil {
 		if glob.State.TPM != state.DummyTPMIdentifier {
 			tui.SetUIState(tui.StSelectTAFailed)
 		}
@@ -39,11 +40,11 @@ func (enroll *enrollCmd) Run(glob *globalOptions) error {
 
 	// when server is set on cmdline during enroll store it in state
 	// so OS startup scripts can attest without needing to know the server URL
-	if cli.Server != nil {
-		glob.State.ServerURL = cli.Server
+	if glob.Server != nil {
+		glob.State.ServerURL = glob.Server
 	}
 
-	if err := attestation.Enroll(ctx, &glob.Client, enroll.Token, glob.EndorsementAuth, defaultNameHint, glob.Anchor, glob.State); err != nil {
+	if err := attestation.Enroll(ctx, &glob.Client, enroll.Token, glob.EndorsementAuth, glob.Anchor, glob.State); err != nil {
 		tui.SetUIState(tui.StEnrollFailed)
 		return err
 	}

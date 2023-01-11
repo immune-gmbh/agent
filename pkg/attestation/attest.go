@@ -17,9 +17,9 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/ima"
-	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 )
@@ -66,21 +66,21 @@ func readAllPCRBanks(ctx context.Context, anchor tcg.TrustAnchor) ([]int, map[st
 	return toQuoteInts, allPCRs, nil
 }
 
-func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State, releaseId string, dumpEvidenceTo string, dryRun bool) (*api.Appraisal, string, error) {
+func Attest(ctx context.Context, glob *core.GlobalOptions, dumpEvidenceTo string, dryRun bool) (*api.Appraisal, string, error) {
 	var conn io.ReadWriteCloser
-	if anch, ok := anchor.(*tcg.TCGAnchor); ok {
+	if anch, ok := glob.Anchor.(*tcg.TCGAnchor); ok {
 		conn = anch.Conn
 	}
 
 	// collect firmware info
 	tui.SetUIState(tui.StCollectFirmwareInfo)
 	logrus.Info("Collecting firmware info")
-	fwProps, err := firmware.GatherFirmwareData(conn, &st.Config)
+	fwProps, err := firmware.GatherFirmwareData(conn, &glob.State.Config)
 	if err != nil {
 		log.Warnf("Failed to gather firmware state")
 		fwProps = api.FirmwareProperties{}
 	}
-	fwProps.Agent.Release = releaseId
+	fwProps.Agent.Release = *glob.ReleaseId
 
 	// transform firmware info into json and crypto-safe canonical json representations
 	fwPropsJSON, err := json.Marshal(fwProps)
@@ -95,7 +95,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	}
 	fwPropsHash := sha256.Sum256(fwPropsJCS)
 
-	toQuote, allPCRs, err := readAllPCRBanks(ctx, anchor)
+	toQuote, allPCRs, err := readAllPCRBanks(ctx, glob.Anchor)
 	if err != nil {
 		log.Debugf("readAllPCRBanks(): %s", err.Error())
 		log.Error("Failed to read all PCR values")
@@ -105,13 +105,13 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	// load Root key
 	tui.SetUIState(tui.StQuotePCR)
 	logrus.Info("Signing attestation data")
-	rootHandle, rootPub, err := anchor.CreateAndLoadRoot(endorsementAuth, st.Root.Auth, &st.Config.Root.Public)
+	rootHandle, rootPub, err := glob.Anchor.CreateAndLoadRoot(glob.EndorsementAuth, glob.State.Root.Auth, &glob.State.Config.Root.Public)
 	if err != nil {
 		log.Debugf("tcg.CreateAndLoadRoot(..): %s", err.Error())
 		log.Error("Failed to create root key")
 		return nil, "", err
 	}
-	defer rootHandle.Flush(anchor)
+	defer rootHandle.Flush(glob.Anchor)
 
 	// make sure we're on the right TPM
 	rootName, err := api.ComputeName(rootPub)
@@ -122,25 +122,25 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	}
 
 	// check the root name. this will change if the endorsement proof value is changed
-	if !api.EqualNames(&rootName, &st.Root.Name) {
+	if !api.EqualNames(&rootName, &glob.State.Root.Name) {
 		log.Error("Failed to recreate enrolled root key. Your TPM was reset, please enroll again.")
 		return nil, "", errors.New("root name changed")
 	}
 
 	// load AIK
-	aik, ok := st.Keys["aik"]
+	aik, ok := glob.State.Keys["aik"]
 	if !ok {
 		log.Errorf("No key suitable for attestation found, please enroll first.")
 		return nil, "", errors.New("no-aik")
 	}
-	aikHandle, err := anchor.LoadDeviceKey(rootHandle, st.Root.Auth, aik.Public, aik.Private)
+	aikHandle, err := glob.Anchor.LoadDeviceKey(rootHandle, glob.State.Root.Auth, aik.Public, aik.Private)
 	if err != nil {
 		log.Debugf("LoadDeviceKey(..): %s", err)
 		log.Error("Failed to load AIK")
 		return nil, "", err
 	}
-	defer aikHandle.Flush(anchor)
-	rootHandle.Flush(anchor)
+	defer aikHandle.Flush(glob.Anchor)
+	rootHandle.Flush(glob.Anchor)
 
 	// convert used PCR banks to tpm2.Algorithm selection for quote
 	var algs []tpm2.Algorithm
@@ -156,13 +156,13 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 
 	// generate quote
 	log.Traceln("generate quote")
-	quote, sig, err := anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuote)
+	quote, sig, err := glob.Anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuote)
 	if err != nil || (sig.ECC == nil && sig.RSA == nil) {
 		log.Debugf("TPM2_Quote failed: %s", err)
 		log.Error("TPM 2.0 attestation failed")
 		return nil, "", err
 	}
-	aikHandle.Flush(anchor)
+	aikHandle.Flush(glob.Anchor)
 
 	// fetch the runtime measurment log
 	fwProps.IMALog = new(api.ErrorBuffer)
@@ -173,8 +173,8 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 		Type:      api.EvidenceType,
 		Quote:     &quote,
 		Signature: &sig,
-		Algorithm: strconv.Itoa(int(st.Config.PCRBank)),
-		PCRs:      allPCRs[strconv.Itoa(int(st.Config.PCRBank))],
+		Algorithm: strconv.Itoa(int(glob.State.Config.PCRBank)),
+		PCRs:      allPCRs[strconv.Itoa(int(glob.State.Config.PCRBank))],
 		AllPCRs:   allPCRs,
 		Firmware:  fwProps,
 		Cookie:    cookie,
@@ -203,7 +203,7 @@ func Attest(ctx context.Context, client *api.Client, endorsementAuth string, anc
 	// API call
 	tui.SetUIState(tui.StSendEvidence)
 	logrus.Info("Sending report to immune Guard cloud")
-	attestResp, webLink, err := client.Attest(ctx, aik.Credential, evidence)
+	attestResp, webLink, err := glob.Client.Attest(ctx, aik.Credential, evidence)
 	// HTTP-level errors
 	if errors.Is(err, api.AuthError) {
 		log.Error("Failed attestation with an authentication error. Please enroll again.")

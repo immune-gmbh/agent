@@ -1,13 +1,8 @@
 package cli
 
 import (
-	"crypto/x509"
-	"encoding/pem"
-	"errors"
 	"net/url"
 	"os"
-	"path"
-	"path/filepath"
 	"runtime"
 
 	"github.com/alecthomas/kong"
@@ -15,9 +10,8 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
 
-	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
-	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 	"github.com/immune-gmbh/agent/v3/pkg/util"
 )
@@ -26,25 +20,6 @@ const (
 	programName = "guard"
 	programDesc = "immune Guard command-line utility"
 )
-
-var (
-	releaseId              string = "unknown"
-	defaultEndorsementAuth string = ""
-	defaultNameHint        string = "Server"
-	defaultServerURL       string = "https://api.immu.ne/v2"
-	cli                    rootCmd
-)
-
-type globalOptions struct {
-	// on-disk state
-	State     *state.State
-	StatePath string
-
-	// derived from cli opts
-	Client          api.Client
-	Anchor          tcg.TrustAnchor
-	EndorsementAuth string
-}
 
 type verboseFlag bool
 
@@ -77,27 +52,35 @@ type rootCmd struct {
 	Collect collectCmd `cmd:"" help:"Only collect firmware data"`
 }
 
-func openTPM(glob *globalOptions) error {
-	a, err := tcg.OpenTPM(glob.State.TPM, glob.State.StubState)
-	if err != nil {
-		logrus.Debugf("tcg.OpenTPM(glob.State.TPM, glob.State.StubState): %s", err.Error())
-		logrus.Errorf("Cannot open TPM: %s", glob.State.TPM)
-		return err
+func initUI(forceColors bool, forceLog bool) {
+	notty := os.Getenv("TERM") == "dumb" || (!isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()))
+
+	// honor NO_COLOR env var as per https://no-color.org/ like the colors library we use does, too
+	_, noColors := os.LookupEnv("NO_COLOR")
+
+	if forceColors || (!notty && !noColors) {
+		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
+		logrus.SetOutput(colorable.NewColorableStdout())
+	} else {
+		logrus.SetFormatter(&logrus.TextFormatter{DisableColors: noColors && !forceColors})
+		logrus.SetOutput(os.Stdout)
 	}
 
-	glob.Anchor = a
-	return nil
+	if !forceLog && !notty {
+		tui.Init()
+		logrus.SetLevel(logrus.ErrorLevel)
+		logrus.SetOutput(tui.Err)
+	}
 }
 
 func RunCommandLineTool() int {
-	glob := globalOptions{
-		EndorsementAuth: defaultEndorsementAuth,
-	}
+	glob := core.NewGlobalOptions()
 
 	// add info about build to description
-	desc := programDesc + " " + releaseId + " (" + runtime.GOARCH + ")"
+	desc := programDesc + " " + *glob.ReleaseId + " (" + runtime.GOARCH + ")"
 
 	// Parse common cli options
+	var cli rootCmd
 	ctx := kong.Parse(&cli,
 		kong.Name(programName),
 		kong.Description(desc),
@@ -128,161 +111,23 @@ func RunCommandLineTool() int {
 		return 1
 	}
 
-	// load on-disk state
-	if err := initState(cli.StateDir, &glob); err != nil {
-		logrus.Error("Cannot restore state")
-		tui.DumpErr()
-		return 1
-	}
-
-	if err := initClient(&glob); err != nil {
+	// init agent core
+	if err := core.Init(glob, cli.StateDir, cli.CA, cli.Server); err != nil {
 		tui.DumpErr()
 		return 1
 	}
 
 	// be sure to run this after we have a client
-	if err := updateConfig(&glob); err != nil {
+	if err := core.UpdateConfig(glob); err != nil {
 		tui.DumpErr()
 		return 1
 	}
 
 	// Run the selected subcommand
-	if err := ctx.Run(&glob); err != nil {
+	if err := ctx.Run(glob); err != nil {
 		tui.DumpErr()
 		return 1
 	} else {
 		return 0
 	}
-}
-
-// try to get a new configuration from server
-func updateConfig(glob *globalOptions) error {
-	update, err := glob.State.EnsureFresh(&glob.Client)
-	if err != nil {
-		logrus.Debugf("Fetching fresh config: %s", err)
-		logrus.Error("Failed to load configuration from server")
-		return err
-	}
-
-	// store it on-disk
-	if update {
-		logrus.Debugf("Storing new config from server")
-		if err := glob.State.Store(glob.StatePath); err != nil {
-			logrus.Debugf("Store(%s): %s", glob.StatePath, err)
-			return err
-		}
-	}
-
-	return nil
-}
-
-func initUI(forceColors bool, forceLog bool) {
-	notty := os.Getenv("TERM") == "dumb" || (!isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()))
-
-	// honor NO_COLOR env var as per https://no-color.org/ like the colors library we use does, too
-	_, noColors := os.LookupEnv("NO_COLOR")
-
-	if forceColors || (!notty && !noColors) {
-		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
-		logrus.SetOutput(colorable.NewColorableStdout())
-	} else {
-		logrus.SetFormatter(&logrus.TextFormatter{DisableColors: noColors && !forceColors})
-		logrus.SetOutput(os.Stdout)
-	}
-
-	if !forceLog && !notty {
-		tui.Init()
-		logrus.SetLevel(logrus.ErrorLevel)
-		logrus.SetOutput(tui.Err)
-	}
-}
-
-// load and migrate on-disk state
-func initState(stateDir string, glob *globalOptions) error {
-	// stateDir is either the OS-specific default or what we get from the CLI
-	if stateDir == "" {
-		logrus.Error("No state directory specified")
-		return errors.New("state parameter empty")
-	}
-
-	// test if the state directory is writable
-	{
-		err := os.MkdirAll(stateDir, os.ModeDir|0750)
-		if err != nil {
-			logrus.Errorf("Can't create state directory, check permissions: %s", stateDir)
-			return err
-		}
-		tmp := filepath.Join(stateDir, "testfile")
-		fd, err := os.Create(tmp)
-		if err != nil {
-			logrus.Errorf("Can't write in state directory, check permissions: %s", stateDir)
-			return err
-		}
-		fd.Close()
-		os.Remove(tmp)
-	}
-
-	glob.StatePath = path.Join(stateDir, "keys")
-
-	// load and migrate state
-	st, update, err := state.LoadState(glob.StatePath)
-	if errors.Is(err, state.ErrNotExist) {
-		logrus.Info("No previous state found")
-		glob.State = state.NewState()
-	} else if errors.Is(err, state.ErrNoPerm) {
-		logrus.Error("Cannot read state, no permissions")
-		return err
-	} else if err != nil {
-		logrus.Debugf("state.LoadState(%s): %s", glob.StatePath, err)
-		return err
-	} else {
-		glob.State = st
-	}
-	if update {
-		logrus.Debugf("Migrating state file to newest version")
-		if err := glob.State.Store(glob.StatePath); err != nil {
-			logrus.Debugf("Store(%s): %s", glob.StatePath, err)
-			return err
-		}
-	}
-
-	return nil
-}
-
-func initClient(glob *globalOptions) error {
-	var caCert *x509.Certificate
-	if cli.CA != "" {
-		buf, err := os.ReadFile(cli.CA)
-		if err != nil {
-			logrus.Errorf("Cannot read '%s': %s", cli.CA, err.Error())
-			return err
-		}
-
-		if pem, _ := pem.Decode(buf); pem != nil {
-			buf = pem.Bytes
-		}
-
-		caCert, err = x509.ParseCertificate(buf)
-		if err != nil {
-			logrus.Errorf("CA certificate ill-formed: %s", err.Error())
-			return err
-		}
-	}
-
-	// use server URL in state, if any, with cmdline setting taking precedence
-	var server *url.URL
-	if cli.Server != nil {
-		server = cli.Server
-	} else if glob.State != nil && glob.State.ServerURL != nil {
-		server = glob.State.ServerURL
-	} else {
-		var err error
-		server, err = url.Parse(defaultServerURL)
-		if err != nil {
-			logrus.Fatal("default server URL is invalid")
-		}
-	}
-
-	glob.Client = api.NewClient(server, caCert, releaseId)
-	return nil
 }
