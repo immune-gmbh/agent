@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"context"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"net/url"
@@ -18,7 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
-	"github.com/immune-gmbh/agent/v3/pkg/attestation"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
@@ -70,7 +67,7 @@ type rootCmd struct {
 	CA       string      `name:"server-ca" help:"immune SaaS API CA (PEM encoded)" optional type:"path"`
 	StateDir string      `name:"state-dir" default:"${state_default_dir}" help:"Directory holding the cli state" type:"path"`
 	LogFlag  bool        `name:"log" help:"Force log output on and text UI off"`
-	Verbose  verboseFlag `help:"Enable verbose mode, implies --log"`
+	Verbose  verboseFlag `help:"Enable verbose mode, implies log"`
 	Trace    traceFlag   `hidden`
 	Colors   bool        `help:"Force colors on for all console outputs (default: autodetect)"`
 
@@ -78,174 +75,6 @@ type rootCmd struct {
 	Attest  attestCmd  `cmd:"" help:"Attests platform integrity of device"`
 	Enroll  enrollCmd  `cmd:"" help:"Enrolls device at the immune SaaS backend"`
 	Collect collectCmd `cmd:"" help:"Only collect firmware data"`
-}
-
-type enrollCmd struct {
-	NoAttest bool   `help:"Don't attest after successful enrollment" default:"false"`
-	Token    string `arg:"" required:"" name:"token" help:"Enrollment authentication token"`
-	Name     string `arg:"" optional:"" name:"name hint" help:"Name to assign to the device. May get suffixed by a counter if already taken. Defaults to the hostname."`
-	TPM      string `name:"tpm" default:"${tpm_default_path}" help:"TPM device: device path (${tpm_default_path}) or mssim, sgx, swtpm/net url (mssim://localhost, sgx://localhost, net://localhost:1234) or 'dummy' for dummy TPM"`
-	DummyTPM bool   `name:"notpm" help:"Force using insecure dummy TPM if this device has no real TPM" default:"false"`
-}
-
-type collectCmd struct {
-}
-
-type attestCmd struct {
-	DryRun bool   `name:"dry-run" help:"Do full attest but don't contact the immune servers" default:"false"`
-	Dump   string `optional:"" name:"dump-report" help:"Specify a file to dump the security report to" type:"path"`
-}
-
-func (enroll *enrollCmd) Run(glob *globalOptions) error {
-	ctx := context.Background()
-
-	// store used TPM in state, use dummy TPM only if forced
-	if enroll.DummyTPM {
-		glob.State.TPM = state.DummyTPMIdentifier
-	} else {
-		glob.State.TPM = enroll.TPM
-	}
-
-	if err := openTPM(glob); err != nil {
-		if glob.State.TPM != state.DummyTPMIdentifier {
-			tui.SetUIState(tui.StSelectTAFailed)
-		}
-		return err
-	}
-	tui.SetUIState(tui.StSelectTASuccess)
-
-	// when server is set on cmdline during enroll store it in state
-	// so OS startup scripts can attest without needing to know the server URL
-	if cli.Server != nil {
-		glob.State.ServerURL = cli.Server
-	}
-
-	if err := attestation.Enroll(ctx, &glob.Client, enroll.Token, glob.EndorsementAuth, defaultNameHint, glob.Anchor, glob.State); err != nil {
-		tui.SetUIState(tui.StEnrollFailed)
-		return err
-	}
-
-	// incorporate dummy TPM state
-	if stub, ok := glob.Anchor.(*tcg.SoftwareAnchor); ok {
-		if st, err := stub.Store(); err != nil {
-			logrus.Debugf("SoftwareAnchor.Store: %s", err)
-			logrus.Errorf("Failed to save stub TPM state to disk")
-		} else {
-			glob.State.StubState = st
-		}
-	}
-
-	// save the new state to disk
-	if err := glob.State.Store(glob.StatePath); err != nil {
-		logrus.Debugf("Store(%s): %s", glob.StatePath, err)
-		logrus.Errorf("Failed to save activated keys to disk")
-		return err
-	}
-
-	tui.SetUIState(tui.StEnrollSuccess)
-	logrus.Infof("Device enrolled")
-	if enroll.NoAttest {
-		logrus.Infof("You can now attest with \"%s attest\"", os.Args[0])
-		return nil
-	}
-
-	return doAttest(glob, ctx, "", false)
-}
-
-func (collect *collectCmd) Run(glob *globalOptions) error {
-	ctx := context.Background()
-	cfg := api.Configuration{}
-
-	err := attestation.Collect(ctx, &cfg)
-	if err != nil {
-		tui.SetUIState(tui.StAttestationFailed)
-		return err
-	}
-
-	tui.SetUIState(tui.StAttestationSuccess)
-	return nil
-}
-
-func (attest *attestCmd) Run(glob *globalOptions) error {
-	ctx := context.Background()
-
-	if !glob.State.IsEnrolled() {
-		logrus.Errorf("No previous state found, please enroll first.")
-		return errors.New("no-state")
-	}
-
-	if err := openTPM(glob); err != nil {
-		return err
-	}
-
-	return doAttest(glob, ctx, attest.Dump, attest.DryRun)
-}
-
-func doAttest(glob *globalOptions, ctx context.Context, dumpReportTo string, dryRun bool) error {
-	appraisal, webLink, err := attestation.Attest(ctx, &glob.Client, glob.EndorsementAuth, glob.Anchor, glob.State, releaseId, dumpReportTo, dryRun)
-	if err != nil {
-		tui.SetUIState(tui.StAttestationFailed)
-		return err
-	}
-
-	inProgress := appraisal == nil
-
-	if inProgress {
-		tui.SetUIState(tui.StAttestationRunning)
-		logrus.Infof("Attestation in progress, results become available later")
-		tui.ShowAppraisalLink(webLink)
-		if webLink != "" {
-			logrus.Infof("See detailed results here: %s", webLink)
-		}
-		return nil
-	} else {
-		tui.SetUIState(tui.StAttestationSuccess)
-		logrus.Infof("Attestation successful")
-	}
-
-	if dryRun {
-		return nil
-	}
-
-	// setting these states will just toggle internal flags in tui
-	// which later affect the trust chain render
-	if appraisal.Verdict.SupplyChain == api.Unsupported {
-		tui.SetUIState(tui.StTscUnsupported)
-	}
-	if appraisal.Verdict.EndpointProtection == api.Unsupported {
-		tui.SetUIState(tui.StEppUnsupported)
-	}
-
-	if appraisal.Verdict.Result == api.Trusted {
-		tui.SetUIState(tui.StDeviceTrusted)
-		tui.SetUIState(tui.StChainAllGood)
-	} else {
-		tui.SetUIState(tui.StDeviceVulnerable)
-		if appraisal.Verdict.SupplyChain == api.Vulnerable {
-			tui.SetUIState(tui.StChainFailSupplyChain)
-		} else if appraisal.Verdict.Configuration == api.Vulnerable {
-			tui.SetUIState(tui.StChainFailConfiguration)
-		} else if appraisal.Verdict.Firmware == api.Vulnerable {
-			tui.SetUIState(tui.StChainFailFirmware)
-		} else if appraisal.Verdict.Bootloader == api.Vulnerable {
-			tui.SetUIState(tui.StChainFailBootloader)
-		} else if appraisal.Verdict.OperatingSystem == api.Vulnerable {
-			tui.SetUIState(tui.StChainFailOperatingSystem)
-		} else if appraisal.Verdict.EndpointProtection == api.Vulnerable {
-			tui.SetUIState(tui.StChainFailEndpointProtection)
-		}
-	}
-
-	tui.ShowAppraisalLink(webLink)
-	if webLink != "" {
-		logrus.Infof("See detailed results here: %s", webLink)
-	}
-
-	if appraisal, err := json.MarshalIndent(*appraisal, "", "  "); err == nil {
-		logrus.Debugln(string(appraisal))
-	}
-
-	return nil
 }
 
 func openTPM(glob *globalOptions) error {
