@@ -15,7 +15,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 )
 
-func Enroll(ctx context.Context, client *api.Client, token string, endorsementAuth string, defaultNameHint string, anchor tcg.TrustAnchor, st *state.State) error {
+func Enroll(ctx context.Context, client *api.Client, token string, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State) error {
 	tui.SetUIState(tui.StCreateKeys)
 	log.Info("Creating Endorsement key")
 	ekHandle, ekPub, err := anchor.GetEndorsementKey()
@@ -84,8 +84,8 @@ func Enroll(ctx context.Context, client *api.Client, token string, endorsementAu
 	log.Info("Certifying TPM keys")
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Debugf("Failed to get hostname, default to %s", defaultNameHint)
-		hostname = defaultNameHint
+		log.Errorf("Failed to get hostname")
+		return err
 	}
 
 	cookie, err := api.Cookie(rand.Reader)

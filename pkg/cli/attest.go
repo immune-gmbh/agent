@@ -7,6 +7,7 @@ import (
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/attestation"
+	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 	"github.com/sirupsen/logrus"
 )
@@ -16,7 +17,7 @@ type attestCmd struct {
 	Dump   string `optional:"" name:"dump-report" help:"Specify a file to dump the security report to" type:"path"`
 }
 
-func (attest *attestCmd) Run(glob *globalOptions) error {
+func (attest *attestCmd) Run(glob *core.GlobalOptions) error {
 	ctx := context.Background()
 
 	if !glob.State.IsEnrolled() {
@@ -24,15 +25,15 @@ func (attest *attestCmd) Run(glob *globalOptions) error {
 		return errors.New("no-state")
 	}
 
-	if err := openTPM(glob); err != nil {
+	if err := core.OpenTPM(glob); err != nil {
 		return err
 	}
 
 	return doAttest(glob, ctx, attest.Dump, attest.DryRun)
 }
 
-func doAttest(glob *globalOptions, ctx context.Context, dumpReportTo string, dryRun bool) error {
-	appraisal, webLink, err := attestation.Attest(ctx, &glob.Client, glob.EndorsementAuth, glob.Anchor, glob.State, releaseId, dumpReportTo, dryRun)
+func doAttest(glob *core.GlobalOptions, ctx context.Context, dumpReportTo string, dryRun bool) error {
+	appraisal, webLink, err := attestation.Attest(ctx, glob, dumpReportTo, dryRun)
 	if err != nil {
 		tui.SetUIState(tui.StAttestationFailed)
 		return err
