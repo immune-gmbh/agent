@@ -15,7 +15,7 @@ DEPS-OTHER:=$(AGENT-OTHER) $(DEPS)
 # build-time parameters, values
 RELEASE_ID?=$(shell git describe --tags)
 GO_ENV:=CGO_ENABLED=0 GOARCH=amd64
-LDFLAGS:=-X main.releaseId=$(RELEASE_ID) -s -w $(LDFLAGS_EXTRA)
+LDFLAGS:=-X github.com/immune-gmbh/agent/v3/pkg/core.releaseId=$(RELEASE_ID) -s -w $(LDFLAGS_EXTRA)
 LDFLAGS-STATIC:=$(LDFLAGS) -extldflags "-static"
 
 # suppress lots of legacy SCCS and RCS lookups
