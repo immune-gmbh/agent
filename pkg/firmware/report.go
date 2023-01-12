@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/acpi"
@@ -156,10 +157,12 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	fwData.Memory.Error = api.NotImplemented
 
 	// FWUPD version and device list
-	fwData.Devices = new(api.Devices)
-	err = fwupd.ReportFWUPD(fwData.Devices)
-	if err != nil {
-		fwData.Devices = nil
+	if runtime.GOOS != "windows" {
+		fwData.Devices = new(api.Devices)
+		err = fwupd.ReportFWUPD(fwData.Devices)
+		if err != nil {
+			fwData.Devices = nil
+		}
 	}
 
 	logrus.Traceln("done gathering report data")
