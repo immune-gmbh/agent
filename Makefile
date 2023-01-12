@@ -66,7 +66,8 @@ test: deps
 
 .PHONY: license-check
 license-check: deps
-	$(GOLIC) --logtostderr check --ignore github.com/immune-gmbh/agent --exclude-restricted $(SRCS-CLIENT)
+	$(GOLIC) --logtostderr check --ignore github.com/immune-gmbh/agent --ignore command-line-arguments --exclude-restricted $(AGENT-OTHER)
+	GOOS=windows $(GOLIC) --logtostderr check --ignore github.com/immune-gmbh/agent --ignore command-line-arguments --exclude-restricted $(AGENT-WIN)
 
 # disable many builtin rules
 .SUFFIXES:
