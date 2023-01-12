@@ -3,7 +3,6 @@
 // license.
 
 //go:build windows
-// +build windows
 
 package winsvc
 
@@ -42,7 +41,7 @@ func exePath() (string, error) {
 	return "", err
 }
 
-func installService(name, desc string) error {
+func Install(name, desc string) error {
 	exepath, err := exePath()
 	if err != nil {
 		return err
@@ -70,7 +69,7 @@ func installService(name, desc string) error {
 	return nil
 }
 
-func removeService(name string) error {
+func Remove(name string) error {
 	m, err := mgr.Connect()
 	if err != nil {
 		return err
