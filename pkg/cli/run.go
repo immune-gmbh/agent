@@ -39,11 +39,11 @@ func (v traceFlag) BeforeApply() error {
 type rootCmd struct {
 	// Global options
 	Server   *url.URL    `name:"server" help:"immune SaaS API URL" type:"*url.URL"`
-	CA       string      `name:"server-ca" help:"immune SaaS API CA (PEM encoded)" optional type:"path"`
+	CA       string      `name:"server-ca" help:"immune SaaS API CA (PEM encoded)" type:"path"`
 	StateDir string      `name:"state-dir" default:"${state_default_dir}" help:"Directory holding the cli state" type:"path"`
 	LogFlag  bool        `name:"log" help:"Force log output on and text UI off"`
 	Verbose  verboseFlag `help:"Enable verbose mode, implies log"`
-	Trace    traceFlag   `hidden`
+	Trace    traceFlag   `hidden:""`
 	Colors   bool        `help:"Force colors on for all console outputs (default: autodetect)"`
 
 	// Subcommands
@@ -79,9 +79,8 @@ func RunCommandLineTool() int {
 	// add info about build to description
 	desc := programDesc + " " + *glob.ReleaseId + " (" + runtime.GOARCH + ")"
 
-	// Parse common cli options
-	var cli rootCmd
-	ctx := kong.Parse(&cli,
+	// Dynamically build Kong options
+	options := []kong.Option{
 		kong.Name(programName),
 		kong.Description(desc),
 		kong.UsageOnError(),
@@ -93,7 +92,13 @@ func RunCommandLineTool() int {
 			"tpm_default_path":  state.DefaultTPMDevice(),
 			"state_default_dir": state.DefaultStateDir(),
 		},
-		kong.Bind(&glob))
+		kong.Bind(&glob),
+	}
+	options = append(options, osSpecificCommands()...)
+
+	// Parse common cli options
+	var cli rootCmd
+	ctx := kong.Parse(&cli, options...)
 
 	initUI(cli.Colors, cli.LogFlag || bool(cli.Verbose) || bool(cli.Trace))
 
