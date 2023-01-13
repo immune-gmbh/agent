@@ -19,18 +19,18 @@ type enrollCmd struct {
 	DummyTPM bool   `name:"notpm" help:"Force using insecure dummy TPM if this device has no real TPM" default:"false"`
 }
 
-func (enroll *enrollCmd) Run(glob *core.GlobalOptions) error {
+func (enroll *enrollCmd) Run(agentCore *core.Core) error {
 	ctx := context.Background()
 
 	// store used TPM in state, use dummy TPM only if forced
 	if enroll.DummyTPM {
-		glob.State.TPM = state.DummyTPMIdentifier
+		agentCore.State.TPM = state.DummyTPMIdentifier
 	} else {
-		glob.State.TPM = enroll.TPM
+		agentCore.State.TPM = enroll.TPM
 	}
 
-	if err := core.OpenTPM(glob); err != nil {
-		if glob.State.TPM != state.DummyTPMIdentifier {
+	if err := core.OpenTPM(agentCore); err != nil {
+		if agentCore.State.TPM != state.DummyTPMIdentifier {
 			tui.SetUIState(tui.StSelectTAFailed)
 		}
 		return err
@@ -39,28 +39,28 @@ func (enroll *enrollCmd) Run(glob *core.GlobalOptions) error {
 
 	// when server is set on cmdline during enroll store it in state
 	// so OS startup scripts can attest without needing to know the server URL
-	if glob.Server != nil {
-		glob.State.ServerURL = glob.Server
+	if agentCore.Server != nil {
+		agentCore.State.ServerURL = agentCore.Server
 	}
 
-	if err := core.Enroll(ctx, glob, enroll.Token); err != nil {
+	if err := agentCore.Enroll(ctx, enroll.Token); err != nil {
 		tui.SetUIState(tui.StEnrollFailed)
 		return err
 	}
 
 	// incorporate dummy TPM state
-	if stub, ok := glob.Anchor.(*tcg.SoftwareAnchor); ok {
+	if stub, ok := agentCore.Anchor.(*tcg.SoftwareAnchor); ok {
 		if st, err := stub.Store(); err != nil {
 			logrus.Debugf("SoftwareAnchor.Store: %s", err)
 			logrus.Errorf("Failed to save stub TPM state to disk")
 		} else {
-			glob.State.StubState = st
+			agentCore.State.StubState = st
 		}
 	}
 
 	// save the new state to disk
-	if err := glob.State.Store(glob.StatePath); err != nil {
-		logrus.Debugf("Store(%s): %s", glob.StatePath, err)
+	if err := agentCore.State.Store(agentCore.StatePath); err != nil {
+		logrus.Debugf("Store(%s): %s", agentCore.StatePath, err)
 		logrus.Errorf("Failed to save activated keys to disk")
 		return err
 	}
@@ -72,5 +72,5 @@ func (enroll *enrollCmd) Run(glob *core.GlobalOptions) error {
 		return nil
 	}
 
-	return doAttest(glob, ctx, "", false)
+	return doAttest(agentCore, ctx, "", false)
 }

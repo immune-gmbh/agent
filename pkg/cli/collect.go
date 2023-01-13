@@ -56,7 +56,7 @@ func doCollect(ctx context.Context, cfg *api.Configuration) error {
 	return nil
 }
 
-func (collect *collectCmd) Run(glob *core.GlobalOptions) error {
+func (collect *collectCmd) Run(glob *core.Core) error {
 	ctx := context.Background()
 	cfg := api.Configuration{}
 

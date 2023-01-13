@@ -48,7 +48,7 @@ func (e *Exponential) Increase() time.Duration {
 
 type agentService struct {
 	backoff *Exponential
-	glob    *core.GlobalOptions
+	core    *core.Core
 }
 
 func (m *agentService) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
@@ -57,7 +57,7 @@ func (m *agentService) Execute(args []string, r <-chan svc.ChangeRequest, change
 	scheduleInterval := time.Millisecond
 	m.backoff = &Exponential{Min: time.Minute, Max: defaultAttestInterval}
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
-	logrus.Infof("immune Guard agent service %s (%s) started", *m.glob.ReleaseId, runtime.GOARCH)
+	logrus.Infof("immune Guard agent service %s (%s) started", *m.core.ReleaseId, runtime.GOARCH)
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -92,10 +92,10 @@ func (m *agentService) runAttest() time.Duration {
 	// try to update our config for each attest we do
 	// we could mostly encounter IO errors here but we should be able
 	// to run attest anyway, so we just let UpdateConfig log the error
-	core.UpdateConfig(m.glob)
+	core.UpdateConfig(m.core)
 
 	// run attest and retry with exponential backoff in case of error
-	_, _, err := core.Attest(ctx, m.glob, "", false)
+	_, _, err := m.core.Attest(ctx, "", false)
 	if err != nil {
 		return m.backoff.Increase()
 	}
@@ -124,21 +124,21 @@ func RunService() int {
 	}
 
 	// init agent core
-	glob := core.NewGlobalOptions()
-	if err := core.Init(glob, state.DefaultStateDir(), "", nil); err != nil {
+	agentCore := core.NewGlobalOptions()
+	if err := core.Init(agentCore, state.DefaultStateDir(), "", nil); err != nil {
 		return 1
 	}
 
-	if !glob.State.IsEnrolled() {
+	if !agentCore.State.IsEnrolled() {
 		logrus.Errorf("No previous state found, please enroll first.")
 		return 1
 	}
 
-	if err := core.OpenTPM(glob); err != nil {
+	if err := core.OpenTPM(agentCore); err != nil {
 		return 1
 	}
 
-	err = svc.Run(SVC_NAME, &agentService{glob: glob})
+	err = svc.Run(SVC_NAME, &agentService{core: agentCore})
 	if err != nil {
 		logrus.Errorf("%s service failed: %v", SVC_NAME, err)
 		return 1

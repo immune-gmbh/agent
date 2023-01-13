@@ -24,7 +24,7 @@ var (
 	defaultEndorsementAuth string = ""
 )
 
-func OpenTPM(glob *GlobalOptions) error {
+func OpenTPM(glob *Core) error {
 	a, err := tcg.OpenTPM(glob.State.TPM, glob.State.StubState)
 	if err != nil {
 		logrus.Debugf("tcg.OpenTPM(glob.State.TPM, glob.State.StubState): %s", err.Error())
@@ -36,15 +36,15 @@ func OpenTPM(glob *GlobalOptions) error {
 	return nil
 }
 
-func NewGlobalOptions() *GlobalOptions {
-	return &GlobalOptions{
+func NewGlobalOptions() *Core {
+	return &Core{
 		ReleaseId:       &releaseId,
 		EndorsementAuth: defaultEndorsementAuth,
 	}
 }
 
 // load and migrate on-disk state
-func initState(glob *GlobalOptions, stateDir string) error {
+func initState(glob *Core, stateDir string) error {
 	// stateDir is either the OS-specific default or what we get from the CLI
 	if stateDir == "" {
 		logrus.Error("No state directory specified")
@@ -95,7 +95,7 @@ func initState(glob *GlobalOptions, stateDir string) error {
 	return nil
 }
 
-func initClient(glob *GlobalOptions, CA string) error {
+func initClient(glob *Core, CA string) error {
 	var caCert *x509.Certificate
 	if CA != "" {
 		buf, err := os.ReadFile(CA)
@@ -134,7 +134,7 @@ func initClient(glob *GlobalOptions, CA string) error {
 }
 
 // try to get a new configuration from server
-func UpdateConfig(glob *GlobalOptions) error {
+func UpdateConfig(glob *Core) error {
 	update, err := glob.State.EnsureFresh(&glob.Client)
 	if err != nil {
 		logrus.Debugf("Fetching fresh config: %s", err)
@@ -154,7 +154,7 @@ func UpdateConfig(glob *GlobalOptions) error {
 	return nil
 }
 
-func Init(glob *GlobalOptions, stateDir, CA string, server *url.URL) error {
+func Init(glob *Core, stateDir, CA string, server *url.URL) error {
 	// store server URL override
 	glob.Server = server
 
