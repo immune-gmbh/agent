@@ -44,7 +44,7 @@ func (enroll *enrollCmd) Run(glob *core.GlobalOptions) error {
 		glob.State.ServerURL = glob.Server
 	}
 
-	if err := attestation.Enroll(ctx, &glob.Client, enroll.Token, glob.EndorsementAuth, glob.Anchor, glob.State); err != nil {
+	if err := attestation.Enroll(ctx, glob, enroll.Token); err != nil {
 		tui.SetUIState(tui.StEnrollFailed)
 		return err
 	}
