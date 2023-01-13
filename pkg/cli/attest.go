@@ -16,19 +16,19 @@ type attestCmd struct {
 	Dump   string `optional:"" name:"dump-report" help:"Specify a file to dump the security report to" type:"path"`
 }
 
-func (attest *attestCmd) Run(glob *core.Core) error {
+func (attest *attestCmd) Run(agentCore *core.Core) error {
 	ctx := context.Background()
 
-	if !glob.State.IsEnrolled() {
+	if !agentCore.State.IsEnrolled() {
 		logrus.Errorf("No previous state found, please enroll first.")
 		return errors.New("no-state")
 	}
 
-	if err := core.OpenTPM(glob); err != nil {
+	if err := agentCore.OpenTPM(); err != nil {
 		return err
 	}
 
-	return doAttest(glob, ctx, attest.Dump, attest.DryRun)
+	return doAttest(agentCore, ctx, attest.Dump, attest.DryRun)
 }
 
 func doAttest(agentCore *core.Core, ctx context.Context, dumpReportTo string, dryRun bool) error {

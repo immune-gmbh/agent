@@ -24,27 +24,27 @@ var (
 	defaultEndorsementAuth string = ""
 )
 
-func OpenTPM(glob *Core) error {
-	a, err := tcg.OpenTPM(glob.State.TPM, glob.State.StubState)
-	if err != nil {
-		logrus.Debugf("tcg.OpenTPM(glob.State.TPM, glob.State.StubState): %s", err.Error())
-		logrus.Errorf("Cannot open TPM: %s", glob.State.TPM)
-		return err
-	}
-
-	glob.Anchor = a
-	return nil
-}
-
-func NewGlobalOptions() *Core {
+func NewCore() *Core {
 	return &Core{
 		ReleaseId:       &releaseId,
 		EndorsementAuth: defaultEndorsementAuth,
 	}
 }
 
+func (core *Core) OpenTPM() error {
+	a, err := tcg.OpenTPM(core.State.TPM, core.State.StubState)
+	if err != nil {
+		logrus.Debugf("tcg.OpenTPM(glob.State.TPM, glob.State.StubState): %s", err.Error())
+		logrus.Errorf("Cannot open TPM: %s", core.State.TPM)
+		return err
+	}
+
+	core.Anchor = a
+	return nil
+}
+
 // load and migrate on-disk state
-func initState(glob *Core, stateDir string) error {
+func (core *Core) initState(stateDir string) error {
 	// stateDir is either the OS-specific default or what we get from the CLI
 	if stateDir == "" {
 		logrus.Error("No state directory specified")
@@ -68,26 +68,26 @@ func initState(glob *Core, stateDir string) error {
 		os.Remove(tmp)
 	}
 
-	glob.StatePath = path.Join(stateDir, "keys")
+	core.StatePath = path.Join(stateDir, "keys")
 
 	// load and migrate state
-	st, update, err := state.LoadState(glob.StatePath)
+	st, update, err := state.LoadState(core.StatePath)
 	if errors.Is(err, state.ErrNotExist) {
 		logrus.Info("No previous state found")
-		glob.State = state.NewState()
+		core.State = state.NewState()
 	} else if errors.Is(err, state.ErrNoPerm) {
 		logrus.Error("Cannot read state, no permissions")
 		return err
 	} else if err != nil {
-		logrus.Debugf("state.LoadState(%s): %s", glob.StatePath, err)
+		logrus.Debugf("state.LoadState(%s): %s", core.StatePath, err)
 		return err
 	} else {
-		glob.State = st
+		core.State = st
 	}
 	if update {
 		logrus.Debugf("Migrating state file to newest version")
-		if err := glob.State.Store(glob.StatePath); err != nil {
-			logrus.Debugf("Store(%s): %s", glob.StatePath, err)
+		if err := core.State.Store(core.StatePath); err != nil {
+			logrus.Debugf("Store(%s): %s", core.StatePath, err)
 			return err
 		}
 	}
@@ -95,7 +95,7 @@ func initState(glob *Core, stateDir string) error {
 	return nil
 }
 
-func initClient(glob *Core, CA string) error {
+func (core *Core) initClient(CA string) error {
 	var caCert *x509.Certificate
 	if CA != "" {
 		buf, err := os.ReadFile(CA)
@@ -117,10 +117,10 @@ func initClient(glob *Core, CA string) error {
 
 	// use server URL in state, if any, with cmdline setting taking precedence
 	var srv *url.URL
-	if glob.Server != nil {
-		srv = glob.Server
-	} else if glob.State != nil && glob.State.ServerURL != nil {
-		srv = glob.State.ServerURL
+	if core.Server != nil {
+		srv = core.Server
+	} else if core.State != nil && core.State.ServerURL != nil {
+		srv = core.State.ServerURL
 	} else {
 		var err error
 		srv, err = url.Parse(defaultServerURL)
@@ -129,13 +129,13 @@ func initClient(glob *Core, CA string) error {
 		}
 	}
 
-	glob.Client = api.NewClient(srv, caCert, releaseId)
+	core.Client = api.NewClient(srv, caCert, releaseId)
 	return nil
 }
 
 // try to get a new configuration from server
-func UpdateConfig(glob *Core) error {
-	update, err := glob.State.EnsureFresh(&glob.Client)
+func (core *Core) UpdateConfig() error {
+	update, err := core.State.EnsureFresh(&core.Client)
 	if err != nil {
 		logrus.Debugf("Fetching fresh config: %s", err)
 		logrus.Error("Failed to load configuration from server")
@@ -145,8 +145,8 @@ func UpdateConfig(glob *Core) error {
 	// store it on-disk
 	if update {
 		logrus.Debugf("Storing new config from server")
-		if err := glob.State.Store(glob.StatePath); err != nil {
-			logrus.Debugf("Store(%s): %s", glob.StatePath, err)
+		if err := core.State.Store(core.StatePath); err != nil {
+			logrus.Debugf("Store(%s): %s", core.StatePath, err)
 			return err
 		}
 	}
@@ -154,18 +154,18 @@ func UpdateConfig(glob *Core) error {
 	return nil
 }
 
-func Init(glob *Core, stateDir, CA string, server *url.URL) error {
+func (core *Core) Init(stateDir, CA string, server *url.URL) error {
 	// store server URL override
-	glob.Server = server
+	core.Server = server
 
 	// load on-disk state
-	if err := initState(glob, stateDir); err != nil {
+	if err := core.initState(stateDir); err != nil {
 		logrus.Error("Cannot restore state")
 		return err
 	}
 
 	// init API client
-	if err := initClient(glob, CA); err != nil {
+	if err := core.initClient(CA); err != nil {
 		return err
 	}
 
