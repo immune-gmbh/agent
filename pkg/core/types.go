@@ -8,7 +8,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 )
 
-type GlobalOptions struct {
+type Core struct {
 	// program info
 	ReleaseId *string
 

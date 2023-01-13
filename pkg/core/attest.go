@@ -14,7 +14,6 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	"github.com/gowebpki/jcs"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware"
@@ -27,7 +26,7 @@ func readAllPCRBanks(ctx context.Context, anchor tcg.TrustAnchor) ([]int, map[st
 	// read all PCRs
 	allPCRs, err := anchor.AllPCRValues()
 	if err != nil {
-		log.Debugf("tcg.AllPCRValues(): %s", err.Error())
+		logrus.Debugf("tcg.AllPCRValues(): %s", err.Error())
 		return nil, nil, err
 	}
 
@@ -41,8 +40,8 @@ func readAllPCRBanks(ctx context.Context, anchor tcg.TrustAnchor) ([]int, map[st
 		for strpcr := range bank {
 			pcr, err := strconv.Atoi(strpcr)
 			if err != nil {
-				log.Debugf("strconv.Atoi(): %s", err.Error())
-				log.Error("Failed to parse PCR index")
+				logrus.Debugf("strconv.Atoi(): %s", err.Error())
+				logrus.Error("Failed to parse PCR index")
 				return nil, nil, err
 			}
 			if pcr < 32 {
@@ -65,103 +64,103 @@ func readAllPCRBanks(ctx context.Context, anchor tcg.TrustAnchor) ([]int, map[st
 	return toQuoteInts, allPCRs, nil
 }
 
-func Attest(ctx context.Context, glob *GlobalOptions, dumpEvidenceTo string, dryRun bool) (*api.Appraisal, string, error) {
+func (core *Core) Attest(ctx context.Context, dumpEvidenceTo string, dryRun bool) (*api.Appraisal, string, error) {
 	var conn io.ReadWriteCloser
-	if anch, ok := glob.Anchor.(*tcg.TCGAnchor); ok {
+	if anch, ok := core.Anchor.(*tcg.TCGAnchor); ok {
 		conn = anch.Conn
 	}
 
 	// collect firmware info
 	tui.SetUIState(tui.StCollectFirmwareInfo)
 	logrus.Info("Collecting firmware info")
-	fwProps, err := firmware.GatherFirmwareData(conn, &glob.State.Config)
+	fwProps, err := firmware.GatherFirmwareData(conn, &core.State.Config)
 	if err != nil {
-		log.Warnf("Failed to gather firmware state")
+		logrus.Warnf("Failed to gather firmware state")
 		fwProps = api.FirmwareProperties{}
 	}
-	fwProps.Agent.Release = *glob.ReleaseId
+	fwProps.Agent.Release = *core.ReleaseId
 
 	// transform firmware info into json and crypto-safe canonical json representations
 	fwPropsJSON, err := json.Marshal(fwProps)
 	if err != nil {
-		log.Debugf("json.Marshal(FirmwareProperties): %s", err.Error())
-		log.Fatalf("Internal error while encoding firmware state. This is a bug, please report it to bugs@immu.ne.")
+		logrus.Debugf("json.Marshal(FirmwareProperties): %s", err.Error())
+		logrus.Fatalf("Internal error while encoding firmware state. This is a bug, please report it to bugs@immu.ne.")
 	}
 	fwPropsJCS, err := jcs.Transform(fwPropsJSON)
 	if err != nil {
-		log.Debugf("jcs.Transform(FirmwareProperties): %s", err.Error())
-		log.Fatalf("Internal error while encoding firmware state. This is a bug, please report it to bugs@immu.ne.")
+		logrus.Debugf("jcs.Transform(FirmwareProperties): %s", err.Error())
+		logrus.Fatalf("Internal error while encoding firmware state. This is a bug, please report it to bugs@immu.ne.")
 	}
 	fwPropsHash := sha256.Sum256(fwPropsJCS)
 
-	toQuote, allPCRs, err := readAllPCRBanks(ctx, glob.Anchor)
+	toQuote, allPCRs, err := readAllPCRBanks(ctx, core.Anchor)
 	if err != nil {
-		log.Debugf("readAllPCRBanks(): %s", err.Error())
-		log.Error("Failed to read all PCR values")
+		logrus.Debugf("readAllPCRBanks(): %s", err.Error())
+		logrus.Error("Failed to read all PCR values")
 		return nil, "", err
 	}
 
 	// load Root key
 	tui.SetUIState(tui.StQuotePCR)
 	logrus.Info("Signing attestation data")
-	rootHandle, rootPub, err := glob.Anchor.CreateAndLoadRoot(glob.EndorsementAuth, glob.State.Root.Auth, &glob.State.Config.Root.Public)
+	rootHandle, rootPub, err := core.Anchor.CreateAndLoadRoot(core.EndorsementAuth, core.State.Root.Auth, &core.State.Config.Root.Public)
 	if err != nil {
-		log.Debugf("tcg.CreateAndLoadRoot(..): %s", err.Error())
-		log.Error("Failed to create root key")
+		logrus.Debugf("tcg.CreateAndLoadRoot(..): %s", err.Error())
+		logrus.Error("Failed to create root key")
 		return nil, "", err
 	}
-	defer rootHandle.Flush(glob.Anchor)
+	defer rootHandle.Flush(core.Anchor)
 
 	// make sure we're on the right TPM
 	rootName, err := api.ComputeName(rootPub)
 	if err != nil {
-		log.Debugf("Name(rootPub): %s", err)
-		log.Error("Internal error while vetting root key. This is a bug, please report it to bugs@immu.ne.")
+		logrus.Debugf("Name(rootPub): %s", err)
+		logrus.Error("Internal error while vetting root key. This is a bug, please report it to bugs@immu.ne.")
 		return nil, "", err
 	}
 
 	// check the root name. this will change if the endorsement proof value is changed
-	if !api.EqualNames(&rootName, &glob.State.Root.Name) {
-		log.Error("Failed to recreate enrolled root key. Your TPM was reset, please enroll again.")
+	if !api.EqualNames(&rootName, &core.State.Root.Name) {
+		logrus.Error("Failed to recreate enrolled root key. Your TPM was reset, please enroll again.")
 		return nil, "", errors.New("root name changed")
 	}
 
 	// load AIK
-	aik, ok := glob.State.Keys["aik"]
+	aik, ok := core.State.Keys["aik"]
 	if !ok {
-		log.Errorf("No key suitable for attestation found, please enroll first.")
+		logrus.Errorf("No key suitable for attestation found, please enroll first.")
 		return nil, "", errors.New("no-aik")
 	}
-	aikHandle, err := glob.Anchor.LoadDeviceKey(rootHandle, glob.State.Root.Auth, aik.Public, aik.Private)
+	aikHandle, err := core.Anchor.LoadDeviceKey(rootHandle, core.State.Root.Auth, aik.Public, aik.Private)
 	if err != nil {
-		log.Debugf("LoadDeviceKey(..): %s", err)
-		log.Error("Failed to load AIK")
+		logrus.Debugf("LoadDeviceKey(..): %s", err)
+		logrus.Error("Failed to load AIK")
 		return nil, "", err
 	}
-	defer aikHandle.Flush(glob.Anchor)
-	rootHandle.Flush(glob.Anchor)
+	defer aikHandle.Flush(core.Anchor)
+	rootHandle.Flush(core.Anchor)
 
 	// convert used PCR banks to tpm2.Algorithm selection for quote
 	var algs []tpm2.Algorithm
 	for k := range allPCRs {
 		alg, err := strconv.ParseInt(k, 10, 16)
 		if err != nil {
-			log.Debugf("ParseInt failed: %s", err)
-			log.Error("Invalid PCR bank selector")
+			logrus.Debugf("ParseInt failed: %s", err)
+			logrus.Error("Invalid PCR bank selector")
 			return nil, "", err
 		}
 		algs = append(algs, tpm2.Algorithm(alg))
 	}
 
 	// generate quote
-	log.Traceln("generate quote")
-	quote, sig, err := glob.Anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuote)
+	logrus.Traceln("generate quote")
+	quote, sig, err := core.Anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuote)
 	if err != nil || (sig.ECC == nil && sig.RSA == nil) {
-		log.Debugf("TPM2_Quote failed: %s", err)
-		log.Error("TPM 2.0 attestation failed")
+		logrus.Debugf("TPM2_Quote failed: %s", err)
+		logrus.Error("TPM 2.0 attestation failed")
 		return nil, "", err
 	}
-	aikHandle.Flush(glob.Anchor)
+	aikHandle.Flush(core.Anchor)
 
 	// fetch the runtime measurment log
 	fwProps.IMALog = new(api.ErrorBuffer)
@@ -172,8 +171,8 @@ func Attest(ctx context.Context, glob *GlobalOptions, dumpEvidenceTo string, dry
 		Type:      api.EvidenceType,
 		Quote:     &quote,
 		Signature: &sig,
-		Algorithm: strconv.Itoa(int(glob.State.Config.PCRBank)),
-		PCRs:      allPCRs[strconv.Itoa(int(glob.State.Config.PCRBank))],
+		Algorithm: strconv.Itoa(int(core.State.Config.PCRBank)),
+		PCRs:      allPCRs[strconv.Itoa(int(core.State.Config.PCRBank))],
 		AllPCRs:   allPCRs,
 		Firmware:  fwProps,
 		Cookie:    cookie,
@@ -202,25 +201,25 @@ func Attest(ctx context.Context, glob *GlobalOptions, dumpEvidenceTo string, dry
 	// API call
 	tui.SetUIState(tui.StSendEvidence)
 	logrus.Info("Sending report to immune Guard cloud")
-	attestResp, webLink, err := glob.Client.Attest(ctx, aik.Credential, evidence)
+	attestResp, webLink, err := core.Client.Attest(ctx, aik.Credential, evidence)
 	// HTTP-level errors
 	if errors.Is(err, api.AuthError) {
-		log.Error("Failed attestation with an authentication error. Please enroll again.")
+		logrus.Error("Failed attestation with an authentication error. Please enroll again.")
 		return nil, "", err
 	} else if errors.Is(err, api.FormatError) {
-		log.Error("Attestation failed. The server rejected our request. Make sure the agent is up to date.")
+		logrus.Error("Attestation failed. The server rejected our request. Make sure the agent is up to date.")
 		return nil, "", err
 	} else if errors.Is(err, api.NetworkError) {
-		log.Error("Attestation failed. Cannot contact the immune Guard server. Make sure you're connected to the internet.")
+		logrus.Error("Attestation failed. Cannot contact the immune Guard server. Make sure you're connected to the internet.")
 		return nil, "", err
 	} else if errors.Is(err, api.ServerError) {
-		log.Error("Attestation failed. The immune Guard server failed to process the request. Please try again later.")
+		logrus.Error("Attestation failed. The immune Guard server failed to process the request. Please try again later.")
 		return nil, "", err
 	} else if errors.Is(err, api.PaymentError) {
-		log.Error("Attestation failed. A payment is required to use the attestation service.")
+		logrus.Error("Attestation failed. A payment is required to use the attestation service.")
 		return nil, "", err
 	} else if err != nil {
-		log.Error("Attestation failed. An unknown error occured. Please try again later.")
+		logrus.Error("Attestation failed. An unknown error occured. Please try again later.")
 		logrus.Debugf("client.Attest(..): %s", err.Error())
 		return nil, "", err
 	}
