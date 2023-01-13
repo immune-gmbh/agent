@@ -1,4 +1,4 @@
-package attestation
+package core
 
 import (
 	"context"
@@ -10,13 +10,12 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
-	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 )
 
-func Enroll(ctx context.Context, glob *core.GlobalOptions, token string) error {
+func Enroll(ctx context.Context, glob *GlobalOptions, token string) error {
 	tui.SetUIState(tui.StCreateKeys)
 	log.Info("Creating Endorsement key")
 	ekHandle, ekPub, err := glob.Anchor.GetEndorsementKey()

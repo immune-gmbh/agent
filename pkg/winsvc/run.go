@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/freman/eventloghook"
-	"github.com/immune-gmbh/agent/v3/pkg/attestation"
 	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/util"
@@ -96,7 +95,7 @@ func (m *agentService) runAttest() time.Duration {
 	core.UpdateConfig(m.glob)
 
 	// run attest and retry with exponential backoff in case of error
-	_, _, err := attestation.Attest(ctx, m.glob, "", false)
+	_, _, err := core.Attest(ctx, m.glob, "", false)
 	if err != nil {
 		return m.backoff.Increase()
 	}

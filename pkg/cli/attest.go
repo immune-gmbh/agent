@@ -6,7 +6,6 @@ import (
 	"errors"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
-	"github.com/immune-gmbh/agent/v3/pkg/attestation"
 	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 	"github.com/sirupsen/logrus"
@@ -33,7 +32,7 @@ func (attest *attestCmd) Run(glob *core.GlobalOptions) error {
 }
 
 func doAttest(glob *core.GlobalOptions, ctx context.Context, dumpReportTo string, dryRun bool) error {
-	appraisal, webLink, err := attestation.Attest(ctx, glob, dumpReportTo, dryRun)
+	appraisal, webLink, err := core.Attest(ctx, glob, dumpReportTo, dryRun)
 	if err != nil {
 		tui.SetUIState(tui.StAttestationFailed)
 		return err

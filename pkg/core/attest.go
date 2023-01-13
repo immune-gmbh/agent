@@ -1,4 +1,4 @@
-package attestation
+package core
 
 import (
 	"context"
@@ -17,7 +17,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
-	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/ima"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
@@ -66,7 +65,7 @@ func readAllPCRBanks(ctx context.Context, anchor tcg.TrustAnchor) ([]int, map[st
 	return toQuoteInts, allPCRs, nil
 }
 
-func Attest(ctx context.Context, glob *core.GlobalOptions, dumpEvidenceTo string, dryRun bool) (*api.Appraisal, string, error) {
+func Attest(ctx context.Context, glob *GlobalOptions, dumpEvidenceTo string, dryRun bool) (*api.Appraisal, string, error) {
 	var conn io.ReadWriteCloser
 	if anch, ok := glob.Anchor.(*tcg.TCGAnchor); ok {
 		conn = anch.Conn

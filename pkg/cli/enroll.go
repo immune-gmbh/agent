@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/immune-gmbh/agent/v3/pkg/attestation"
 	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
@@ -44,7 +43,7 @@ func (enroll *enrollCmd) Run(glob *core.GlobalOptions) error {
 		glob.State.ServerURL = glob.Server
 	}
 
-	if err := attestation.Enroll(ctx, glob, enroll.Token); err != nil {
+	if err := core.Enroll(ctx, glob, enroll.Token); err != nil {
 		tui.SetUIState(tui.StEnrollFailed)
 		return err
 	}
