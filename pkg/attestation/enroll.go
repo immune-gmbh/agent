@@ -10,42 +10,43 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 )
 
-func Enroll(ctx context.Context, client *api.Client, token string, endorsementAuth string, anchor tcg.TrustAnchor, st *state.State) error {
+func Enroll(ctx context.Context, glob *core.GlobalOptions, token string) error {
 	tui.SetUIState(tui.StCreateKeys)
 	log.Info("Creating Endorsement key")
-	ekHandle, ekPub, err := anchor.GetEndorsementKey()
+	ekHandle, ekPub, err := glob.Anchor.GetEndorsementKey()
 	if err != nil {
 		log.Debugf("tcg.GetEndorsementKey(glob.TpmConn): %s", err.Error())
 		log.Error("Cannot create Endorsement key")
 		return err
 	}
-	defer ekHandle.Flush(anchor)
-	st.EndorsementKey = api.PublicKey(ekPub)
+	defer ekHandle.Flush(glob.Anchor)
+	glob.State.EndorsementKey = api.PublicKey(ekPub)
 
 	log.Info("Reading Endorsement key certificate")
-	ekCert, err := anchor.ReadEKCertificate()
+	ekCert, err := glob.Anchor.ReadEKCertificate()
 	if err != nil {
 		log.Debugf("tcg.ReadEKCertificate(glob.TpmConn): %s", err.Error())
 		log.Warn("No Endorsement key certificate in NVRAM")
-		st.EndorsementCertificate = nil
+		glob.State.EndorsementCertificate = nil
 	} else {
 		c := api.Certificate(*ekCert)
-		st.EndorsementCertificate = &c
+		glob.State.EndorsementCertificate = &c
 	}
 
 	log.Info("Creating Root key")
-	rootHandle, rootPub, err := anchor.CreateAndLoadRoot(endorsementAuth, "", &st.Config.Root.Public)
+	rootHandle, rootPub, err := glob.Anchor.CreateAndLoadRoot(glob.EndorsementAuth, "", &glob.State.Config.Root.Public)
 	if err != nil {
 		log.Debugf("tcg.CreateAndLoadRoot(..): %s", err.Error())
 		log.Error("Failed to create root key")
 		return err
 	}
-	defer rootHandle.Flush(anchor)
+	defer rootHandle.Flush(glob.Anchor)
 
 	rootName, err := api.ComputeName(rootPub)
 	if err != nil {
@@ -53,11 +54,11 @@ func Enroll(ctx context.Context, client *api.Client, token string, endorsementAu
 		log.Error("Internal error while vetting root key. This is a bug, please report it to bugs@immu.ne.")
 		return err
 	}
-	st.Root.Name = rootName
+	glob.State.Root.Name = rootName
 
 	keyCerts := make(map[string]api.Key)
-	st.Keys = make(map[string]state.DeviceKeyV3)
-	for keyName, keyTmpl := range st.Config.Keys {
+	glob.State.Keys = make(map[string]state.DeviceKeyV3)
+	for keyName, keyTmpl := range glob.State.Config.Keys {
 		log.Infof("Creating '%s' key", keyName)
 		keyAuth, err := tcg.GenerateAuthValue()
 		if err != nil {
@@ -65,14 +66,14 @@ func Enroll(ctx context.Context, client *api.Client, token string, endorsementAu
 			log.Error("Failed to generate Auth Value")
 			return err
 		}
-		key, priv, err := anchor.CreateAndCertifyDeviceKey(rootHandle, st.Root.Auth, keyTmpl, keyAuth)
+		key, priv, err := glob.Anchor.CreateAndCertifyDeviceKey(rootHandle, glob.State.Root.Auth, keyTmpl, keyAuth)
 		if err != nil {
 			log.Debugf("tcg.CreateAndCertifyDeviceKey(..): %s", err.Error())
 			log.Errorf("Failed to create %s key and its certification values", keyName)
 			return err
 		}
 
-		st.Keys[keyName] = state.DeviceKeyV3{
+		glob.State.Keys[keyName] = state.DeviceKeyV3{
 			Public:     key.Public,
 			Private:    priv,
 			Auth:       keyAuth,
@@ -98,14 +99,14 @@ func Enroll(ctx context.Context, client *api.Client, token string, endorsementAu
 	var enrollReq api.Enrollment = api.Enrollment{
 		NameHint:               hostname,
 		Cookie:                 cookie,
-		EndoresmentCertificate: st.EndorsementCertificate,
-		EndoresmentKey:         st.EndorsementKey,
+		EndoresmentCertificate: glob.State.EndorsementCertificate,
+		EndoresmentKey:         glob.State.EndorsementKey,
 		Root:                   rootPub,
 		Keys:                   keyCerts,
 	}
 
 	tui.SetUIState(tui.StEnrollKeys)
-	enrollResp, err := client.Enroll(ctx, token, enrollReq)
+	enrollResp, err := glob.Client.Enroll(ctx, token, enrollReq)
 	// HTTP-level errors
 	if errors.Is(err, api.AuthError) {
 		log.Error("Failed enrollment with an authentication error. Make sure the enrollment token is correct.")
@@ -135,22 +136,22 @@ func Enroll(ctx context.Context, client *api.Client, token string, endorsementAu
 
 	keyCreds := make(map[string]string)
 	for _, encCred := range enrollResp {
-		key, ok := st.Keys[encCred.Name]
+		key, ok := glob.State.Keys[encCred.Name]
 		if !ok {
 			log.Debugf("Got encrypted credential for unknown key %s", encCred.Name)
 			log.Error("Enrollment failed. Cannot understand the servers response. Make sure the agent is up to date.")
 			return fmt.Errorf("unknown key")
 		}
 
-		handle, err := anchor.LoadDeviceKey(rootHandle, st.Root.Auth, key.Public, key.Private)
+		handle, err := glob.Anchor.LoadDeviceKey(rootHandle, glob.State.Root.Auth, key.Public, key.Private)
 		if err != nil {
 			log.Debugf("tcg.LoadDeviceKey(..): %s", err)
 			log.Errorf("Cannot load %s key.", encCred.Name)
 			return err
 		}
 
-		cred, err := anchor.ActivateDeviceKey(*encCred, endorsementAuth, key.Auth, handle, ekHandle, st)
-		handle.Flush(anchor)
+		cred, err := glob.Anchor.ActivateDeviceKey(*encCred, glob.EndorsementAuth, key.Auth, handle, ekHandle, glob.State)
+		handle.Flush(glob.Anchor)
 		if err != nil {
 			log.Debugf("tcg.ActivateDeviceKey(..): %s", err)
 			log.Errorf("Cannot active %s key.", encCred.Name)
@@ -160,8 +161,8 @@ func Enroll(ctx context.Context, client *api.Client, token string, endorsementAu
 		keyCreds[encCred.Name] = cred
 	}
 
-	if len(keyCreds) != len(st.Keys) {
-		log.Warnf("Failed to active all keys. Got credentials for %d keys but requested %d.", len(keyCreds), len(st.Keys))
+	if len(keyCreds) != len(glob.State.Keys) {
+		log.Warnf("Failed to active all keys. Got credentials for %d keys but requested %d.", len(keyCreds), len(glob.State.Keys))
 
 		if _, ok := keyCerts["aik"]; !ok {
 			log.Errorf("Server refused to certify attestation key.")
@@ -170,9 +171,9 @@ func Enroll(ctx context.Context, client *api.Client, token string, endorsementAu
 	}
 
 	for keyName, keyCred := range keyCreds {
-		key := st.Keys[keyName]
+		key := glob.State.Keys[keyName]
 		key.Credential = keyCred
-		st.Keys[keyName] = key
+		glob.State.Keys[keyName] = key
 	}
 
 	return nil
