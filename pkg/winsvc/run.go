@@ -92,7 +92,7 @@ func (m *agentService) runAttest() time.Duration {
 	// try to update our config for each attest we do
 	// we could mostly encounter IO errors here but we should be able
 	// to run attest anyway, so we just let UpdateConfig log the error
-	core.UpdateConfig(m.core)
+	m.core.UpdateConfig()
 
 	// run attest and retry with exponential backoff in case of error
 	_, _, err := m.core.Attest(ctx, "", false)
@@ -124,8 +124,8 @@ func RunService() int {
 	}
 
 	// init agent core
-	agentCore := core.NewGlobalOptions()
-	if err := core.Init(agentCore, state.DefaultStateDir(), "", nil); err != nil {
+	agentCore := core.NewCore()
+	if err := agentCore.Init(state.DefaultStateDir(), "", nil); err != nil {
 		return 1
 	}
 
@@ -134,7 +134,7 @@ func RunService() int {
 		return 1
 	}
 
-	if err := core.OpenTPM(agentCore); err != nil {
+	if err := agentCore.OpenTPM(); err != nil {
 		return 1
 	}
 

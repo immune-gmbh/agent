@@ -29,7 +29,7 @@ func (enroll *enrollCmd) Run(agentCore *core.Core) error {
 		agentCore.State.TPM = enroll.TPM
 	}
 
-	if err := core.OpenTPM(agentCore); err != nil {
+	if err := agentCore.OpenTPM(); err != nil {
 		if agentCore.State.TPM != state.DummyTPMIdentifier {
 			tui.SetUIState(tui.StSelectTAFailed)
 		}

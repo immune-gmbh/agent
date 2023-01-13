@@ -74,10 +74,10 @@ func initUI(forceColors bool, forceLog bool) {
 }
 
 func RunCommandLineTool() int {
-	glob := core.NewGlobalOptions()
+	agentCore := core.NewCore()
 
 	// add info about build to description
-	desc := programDesc + " " + *glob.ReleaseId + " (" + runtime.GOARCH + ")"
+	desc := programDesc + " " + *agentCore.ReleaseId + " (" + runtime.GOARCH + ")"
 
 	// Dynamically build Kong options
 	options := []kong.Option{
@@ -92,7 +92,7 @@ func RunCommandLineTool() int {
 			"tpm_default_path":  state.DefaultTPMDevice(),
 			"state_default_dir": state.DefaultStateDir(),
 		},
-		kong.Bind(&glob),
+		kong.Bind(&agentCore),
 	}
 	options = append(options, osSpecificCommands()...)
 
@@ -117,19 +117,19 @@ func RunCommandLineTool() int {
 	}
 
 	// init agent core
-	if err := core.Init(glob, cli.StateDir, cli.CA, cli.Server); err != nil {
+	if err := agentCore.Init(cli.StateDir, cli.CA, cli.Server); err != nil {
 		tui.DumpErr()
 		return 1
 	}
 
 	// be sure to run this after we have a client
-	if err := core.UpdateConfig(glob); err != nil {
+	if err := agentCore.UpdateConfig(); err != nil {
 		tui.DumpErr()
 		return 1
 	}
 
 	// Run the selected subcommand
-	if err := ctx.Run(glob); err != nil {
+	if err := ctx.Run(agentCore); err != nil {
 		tui.DumpErr()
 		return 1
 	} else {
