@@ -19,7 +19,7 @@ type enrollCmd struct {
 	DummyTPM bool   `name:"notpm" help:"Force using insecure dummy TPM if this device has no real TPM" default:"false"`
 }
 
-func (enroll *enrollCmd) Run(agentCore *core.Core) error {
+func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 	ctx := context.Background()
 
 	// store used TPM in state, use dummy TPM only if forced

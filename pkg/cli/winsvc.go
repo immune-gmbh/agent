@@ -16,7 +16,7 @@ type cmdWinSvc struct {
 
 type cmdWinSvcInstall struct{}
 
-func (c *cmdWinSvcInstall) Run(glob *core.Core) error {
+func (c *cmdWinSvcInstall) Run(glob *core.AttestationClient) error {
 	err := winsvc.Install(winsvc.SVC_NAME, winsvc.SVC_DESC)
 	if err != nil {
 		logrus.Errorf("failed to install service: %v", err)
@@ -29,7 +29,7 @@ func (c *cmdWinSvcInstall) Run(glob *core.Core) error {
 
 type cmdWinSvcRemove struct{}
 
-func (c *cmdWinSvcRemove) Run(glob *core.Core) error {
+func (c *cmdWinSvcRemove) Run(glob *core.AttestationClient) error {
 	err := winsvc.Remove(winsvc.SVC_NAME)
 	if err != nil {
 		logrus.Errorf("failed to remove service: %v", err)
