@@ -117,7 +117,7 @@ func RunCommandLineTool() int {
 	}
 
 	// init agent core
-	if err := agentCore.Init(cli.StateDir, cli.CA, cli.Server); err != nil {
+	if err := agentCore.Init(cli.StateDir, cli.CA, cli.Server, logrus.StandardLogger()); err != nil {
 		tui.DumpErr()
 		return 1
 	}

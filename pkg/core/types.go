@@ -6,6 +6,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
+	"github.com/sirupsen/logrus"
 )
 
 type Core struct {
@@ -16,9 +17,14 @@ type Core struct {
 	State     *state.State
 	StatePath string
 
-	// derived from cli opts
-	Server          *url.URL
-	Client          api.Client
+	// API client
+	Server *url.URL
+	Client api.Client
+
+	// TPM
 	Anchor          tcg.TrustAnchor
 	EndorsementAuth string
+
+	// Logging
+	Log *logrus.Logger
 }

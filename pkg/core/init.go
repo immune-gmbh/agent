@@ -34,8 +34,8 @@ func NewCore() *Core {
 func (core *Core) OpenTPM() error {
 	a, err := tcg.OpenTPM(core.State.TPM, core.State.StubState)
 	if err != nil {
-		logrus.Debugf("tcg.OpenTPM(glob.State.TPM, glob.State.StubState): %s", err.Error())
-		logrus.Errorf("Cannot open TPM: %s", core.State.TPM)
+		core.Log.Debugf("tcg.OpenTPM(glob.State.TPM, glob.State.StubState): %s", err.Error())
+		core.Log.Errorf("Cannot open TPM: %s", core.State.TPM)
 		return err
 	}
 
@@ -47,7 +47,7 @@ func (core *Core) OpenTPM() error {
 func (core *Core) initState(stateDir string) error {
 	// stateDir is either the OS-specific default or what we get from the CLI
 	if stateDir == "" {
-		logrus.Error("No state directory specified")
+		core.Log.Error("No state directory specified")
 		return errors.New("state parameter empty")
 	}
 
@@ -55,13 +55,13 @@ func (core *Core) initState(stateDir string) error {
 	{
 		err := os.MkdirAll(stateDir, os.ModeDir|0750)
 		if err != nil {
-			logrus.Errorf("Can't create state directory, check permissions: %s", stateDir)
+			core.Log.Errorf("Can't create state directory, check permissions: %s", stateDir)
 			return err
 		}
 		tmp := filepath.Join(stateDir, "testfile")
 		fd, err := os.Create(tmp)
 		if err != nil {
-			logrus.Errorf("Can't write in state directory, check permissions: %s", stateDir)
+			core.Log.Errorf("Can't write in state directory, check permissions: %s", stateDir)
 			return err
 		}
 		fd.Close()
@@ -73,21 +73,21 @@ func (core *Core) initState(stateDir string) error {
 	// load and migrate state
 	st, update, err := state.LoadState(core.StatePath)
 	if errors.Is(err, state.ErrNotExist) {
-		logrus.Info("No previous state found")
+		core.Log.Info("No previous state found")
 		core.State = state.NewState()
 	} else if errors.Is(err, state.ErrNoPerm) {
-		logrus.Error("Cannot read state, no permissions")
+		core.Log.Error("Cannot read state, no permissions")
 		return err
 	} else if err != nil {
-		logrus.Debugf("state.LoadState(%s): %s", core.StatePath, err)
+		core.Log.Debugf("state.LoadState(%s): %s", core.StatePath, err)
 		return err
 	} else {
 		core.State = st
 	}
 	if update {
-		logrus.Debugf("Migrating state file to newest version")
+		core.Log.Debugf("Migrating state file to newest version")
 		if err := core.State.Store(core.StatePath); err != nil {
-			logrus.Debugf("Store(%s): %s", core.StatePath, err)
+			core.Log.Debugf("Store(%s): %s", core.StatePath, err)
 			return err
 		}
 	}
@@ -100,7 +100,7 @@ func (core *Core) initClient(CA string) error {
 	if CA != "" {
 		buf, err := os.ReadFile(CA)
 		if err != nil {
-			logrus.Errorf("Cannot read '%s': %s", CA, err.Error())
+			core.Log.Errorf("Cannot read '%s': %s", CA, err.Error())
 			return err
 		}
 
@@ -110,7 +110,7 @@ func (core *Core) initClient(CA string) error {
 
 		caCert, err = x509.ParseCertificate(buf)
 		if err != nil {
-			logrus.Errorf("CA certificate ill-formed: %s", err.Error())
+			core.Log.Errorf("CA certificate ill-formed: %s", err.Error())
 			return err
 		}
 	}
@@ -125,7 +125,7 @@ func (core *Core) initClient(CA string) error {
 		var err error
 		srv, err = url.Parse(defaultServerURL)
 		if err != nil {
-			logrus.Fatal("default server URL is invalid")
+			core.Log.Fatal("default server URL is invalid")
 		}
 	}
 
@@ -137,16 +137,16 @@ func (core *Core) initClient(CA string) error {
 func (core *Core) UpdateConfig() error {
 	update, err := core.State.EnsureFresh(&core.Client)
 	if err != nil {
-		logrus.Debugf("Fetching fresh config: %s", err)
-		logrus.Error("Failed to load configuration from server")
+		core.Log.Debugf("Fetching fresh config: %s", err)
+		core.Log.Error("Failed to load configuration from server")
 		return err
 	}
 
 	// store it on-disk
 	if update {
-		logrus.Debugf("Storing new config from server")
+		core.Log.Debugf("Storing new config from server")
 		if err := core.State.Store(core.StatePath); err != nil {
-			logrus.Debugf("Store(%s): %s", core.StatePath, err)
+			core.Log.Debugf("Store(%s): %s", core.StatePath, err)
 			return err
 		}
 	}
@@ -154,13 +154,13 @@ func (core *Core) UpdateConfig() error {
 	return nil
 }
 
-func (core *Core) Init(stateDir, CA string, server *url.URL) error {
+func (core *Core) Init(stateDir, CA string, server *url.URL, logger *logrus.Logger) error {
 	// store server URL override
 	core.Server = server
 
 	// load on-disk state
 	if err := core.initState(stateDir); err != nil {
-		logrus.Error("Cannot restore state")
+		core.Log.Error("Cannot restore state")
 		return err
 	}
 
@@ -168,6 +168,8 @@ func (core *Core) Init(stateDir, CA string, server *url.URL) error {
 	if err := core.initClient(CA); err != nil {
 		return err
 	}
+
+	core.Log = logger
 
 	return nil
 }
