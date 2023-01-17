@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
@@ -58,9 +59,11 @@ func (testAnchor) Close() {
 
 func TestToQuoteList(t *testing.T) {
 	ctx := context.Background()
+	agentCore := NewCore()
+	agentCore.Log = logrus.StandardLogger()
 
 	// sha1 only
-	anchor := testAnchor{
+	agentCore.Anchor = testAnchor{
 		Banks: map[string]map[string]api.Buffer{
 			"11": {},
 			"4": {
@@ -73,13 +76,13 @@ func TestToQuoteList(t *testing.T) {
 			},
 		},
 	}
-	toQuote, allPcr, err := readAllPCRBanks(ctx, anchor)
+	toQuote, allPcr, err := agentCore.readAllPCRBanks(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, []int{0, 1, 2, 3, 4, 5}, toQuote)
 	assert.NotEmpty(t, allPcr)
 
 	// sha256 only
-	anchor = testAnchor{
+	agentCore.Anchor = testAnchor{
 		Banks: map[string]map[string]api.Buffer{
 			"11": {
 				"0": {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -92,13 +95,13 @@ func TestToQuoteList(t *testing.T) {
 			"4": {},
 		},
 	}
-	toQuote, allPcr, err = readAllPCRBanks(ctx, anchor)
+	toQuote, allPcr, err = agentCore.readAllPCRBanks(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, []int{0, 1, 2, 3, 4, 5}, toQuote)
 	assert.NotEmpty(t, allPcr)
 
 	// sha1 & sha256
-	anchor = testAnchor{
+	agentCore.Anchor = testAnchor{
 		Banks: map[string]map[string]api.Buffer{
 			"11": {
 				"0": {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -118,13 +121,13 @@ func TestToQuoteList(t *testing.T) {
 			},
 		},
 	}
-	toQuote, allPcr, err = readAllPCRBanks(ctx, anchor)
+	toQuote, allPcr, err = agentCore.readAllPCRBanks(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, []int{0, 1, 2, 3, 4, 5}, toQuote)
 	assert.NotEmpty(t, allPcr)
 
 	// subset sha1 & sha256
-	anchor = testAnchor{
+	agentCore.Anchor = testAnchor{
 		Banks: map[string]map[string]api.Buffer{
 			"11": {
 				"2": {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -140,7 +143,7 @@ func TestToQuoteList(t *testing.T) {
 			},
 		},
 	}
-	toQuote, allPcr, err = readAllPCRBanks(ctx, anchor)
+	toQuote, allPcr, err = agentCore.readAllPCRBanks(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, []int{2, 3}, toQuote)
 	assert.NotEmpty(t, allPcr)
