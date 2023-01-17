@@ -16,7 +16,7 @@ type attestCmd struct {
 	Dump   string `optional:"" name:"dump-report" help:"Specify a file to dump the security report to" type:"path"`
 }
 
-func (attest *attestCmd) Run(agentCore *core.Core) error {
+func (attest *attestCmd) Run(agentCore *core.AttestationClient) error {
 	ctx := context.Background()
 
 	if !agentCore.State.IsEnrolled() {
@@ -31,7 +31,7 @@ func (attest *attestCmd) Run(agentCore *core.Core) error {
 	return doAttest(agentCore, ctx, attest.Dump, attest.DryRun)
 }
 
-func doAttest(agentCore *core.Core, ctx context.Context, dumpReportTo string, dryRun bool) error {
+func doAttest(agentCore *core.AttestationClient, ctx context.Context, dumpReportTo string, dryRun bool) error {
 	appraisal, webLink, err := agentCore.Attest(ctx, dumpReportTo, dryRun)
 	if err != nil {
 		tui.SetUIState(tui.StAttestationFailed)

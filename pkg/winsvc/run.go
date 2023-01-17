@@ -48,7 +48,7 @@ func (e *Exponential) Increase() time.Duration {
 
 type agentService struct {
 	backoff *Exponential
-	core    *core.Core
+	core    *core.AttestationClient
 }
 
 func (m *agentService) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {

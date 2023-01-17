@@ -24,30 +24,30 @@ var (
 	defaultEndorsementAuth string = ""
 )
 
-func NewCore() *Core {
-	return &Core{
+func NewCore() *AttestationClient {
+	return &AttestationClient{
 		ReleaseId:       &releaseId,
 		EndorsementAuth: defaultEndorsementAuth,
 	}
 }
 
-func (core *Core) OpenTPM() error {
-	a, err := tcg.OpenTPM(core.State.TPM, core.State.StubState)
+func (ac *AttestationClient) OpenTPM() error {
+	a, err := tcg.OpenTPM(ac.State.TPM, ac.State.StubState)
 	if err != nil {
-		core.Log.Debugf("tcg.OpenTPM(glob.State.TPM, glob.State.StubState): %s", err.Error())
-		core.Log.Errorf("Cannot open TPM: %s", core.State.TPM)
+		ac.Log.Debugf("tcg.OpenTPM(glob.State.TPM, glob.State.StubState): %s", err.Error())
+		ac.Log.Errorf("Cannot open TPM: %s", ac.State.TPM)
 		return err
 	}
 
-	core.Anchor = a
+	ac.Anchor = a
 	return nil
 }
 
 // load and migrate on-disk state
-func (core *Core) initState(stateDir string) error {
+func (ac *AttestationClient) initState(stateDir string) error {
 	// stateDir is either the OS-specific default or what we get from the CLI
 	if stateDir == "" {
-		core.Log.Error("No state directory specified")
+		ac.Log.Error("No state directory specified")
 		return errors.New("state parameter empty")
 	}
 
@@ -55,39 +55,39 @@ func (core *Core) initState(stateDir string) error {
 	{
 		err := os.MkdirAll(stateDir, os.ModeDir|0750)
 		if err != nil {
-			core.Log.Errorf("Can't create state directory, check permissions: %s", stateDir)
+			ac.Log.Errorf("Can't create state directory, check permissions: %s", stateDir)
 			return err
 		}
 		tmp := filepath.Join(stateDir, "testfile")
 		fd, err := os.Create(tmp)
 		if err != nil {
-			core.Log.Errorf("Can't write in state directory, check permissions: %s", stateDir)
+			ac.Log.Errorf("Can't write in state directory, check permissions: %s", stateDir)
 			return err
 		}
 		fd.Close()
 		os.Remove(tmp)
 	}
 
-	core.StatePath = path.Join(stateDir, "keys")
+	ac.StatePath = path.Join(stateDir, "keys")
 
 	// load and migrate state
-	st, update, err := state.LoadState(core.StatePath)
+	st, update, err := state.LoadState(ac.StatePath)
 	if errors.Is(err, state.ErrNotExist) {
-		core.Log.Info("No previous state found")
-		core.State = state.NewState()
+		ac.Log.Info("No previous state found")
+		ac.State = state.NewState()
 	} else if errors.Is(err, state.ErrNoPerm) {
-		core.Log.Error("Cannot read state, no permissions")
+		ac.Log.Error("Cannot read state, no permissions")
 		return err
 	} else if err != nil {
-		core.Log.Debugf("state.LoadState(%s): %s", core.StatePath, err)
+		ac.Log.Debugf("state.LoadState(%s): %s", ac.StatePath, err)
 		return err
 	} else {
-		core.State = st
+		ac.State = st
 	}
 	if update {
-		core.Log.Debugf("Migrating state file to newest version")
-		if err := core.State.Store(core.StatePath); err != nil {
-			core.Log.Debugf("Store(%s): %s", core.StatePath, err)
+		ac.Log.Debugf("Migrating state file to newest version")
+		if err := ac.State.Store(ac.StatePath); err != nil {
+			ac.Log.Debugf("Store(%s): %s", ac.StatePath, err)
 			return err
 		}
 	}
@@ -95,12 +95,12 @@ func (core *Core) initState(stateDir string) error {
 	return nil
 }
 
-func (core *Core) initClient(CA string) error {
+func (ac *AttestationClient) initClient(CA string) error {
 	var caCert *x509.Certificate
 	if CA != "" {
 		buf, err := os.ReadFile(CA)
 		if err != nil {
-			core.Log.Errorf("Cannot read '%s': %s", CA, err.Error())
+			ac.Log.Errorf("Cannot read '%s': %s", CA, err.Error())
 			return err
 		}
 
@@ -110,43 +110,43 @@ func (core *Core) initClient(CA string) error {
 
 		caCert, err = x509.ParseCertificate(buf)
 		if err != nil {
-			core.Log.Errorf("CA certificate ill-formed: %s", err.Error())
+			ac.Log.Errorf("CA certificate ill-formed: %s", err.Error())
 			return err
 		}
 	}
 
 	// use server URL in state, if any, with cmdline setting taking precedence
 	var srv *url.URL
-	if core.Server != nil {
-		srv = core.Server
-	} else if core.State != nil && core.State.ServerURL != nil {
-		srv = core.State.ServerURL
+	if ac.Server != nil {
+		srv = ac.Server
+	} else if ac.State != nil && ac.State.ServerURL != nil {
+		srv = ac.State.ServerURL
 	} else {
 		var err error
 		srv, err = url.Parse(defaultServerURL)
 		if err != nil {
-			core.Log.Fatal("default server URL is invalid")
+			ac.Log.Fatal("default server URL is invalid")
 		}
 	}
 
-	core.Client = api.NewClient(srv, caCert, releaseId)
+	ac.Client = api.NewClient(srv, caCert, releaseId)
 	return nil
 }
 
 // try to get a new configuration from server
-func (core *Core) UpdateConfig() error {
-	update, err := core.State.EnsureFresh(&core.Client)
+func (ac *AttestationClient) UpdateConfig() error {
+	update, err := ac.State.EnsureFresh(&ac.Client)
 	if err != nil {
-		core.Log.Debugf("Fetching fresh config: %s", err)
-		core.Log.Error("Failed to load configuration from server")
+		ac.Log.Debugf("Fetching fresh config: %s", err)
+		ac.Log.Error("Failed to load configuration from server")
 		return err
 	}
 
 	// store it on-disk
 	if update {
-		core.Log.Debugf("Storing new config from server")
-		if err := core.State.Store(core.StatePath); err != nil {
-			core.Log.Debugf("Store(%s): %s", core.StatePath, err)
+		ac.Log.Debugf("Storing new config from server")
+		if err := ac.State.Store(ac.StatePath); err != nil {
+			ac.Log.Debugf("Store(%s): %s", ac.StatePath, err)
 			return err
 		}
 	}
@@ -154,22 +154,22 @@ func (core *Core) UpdateConfig() error {
 	return nil
 }
 
-func (core *Core) Init(stateDir, CA string, server *url.URL, logger *logrus.Logger) error {
+func (ac *AttestationClient) Init(stateDir, CA string, server *url.URL, logger *logrus.Logger) error {
 	// store server URL override
-	core.Server = server
+	ac.Server = server
 
 	// load on-disk state
-	if err := core.initState(stateDir); err != nil {
-		core.Log.Error("Cannot restore state")
+	if err := ac.initState(stateDir); err != nil {
+		ac.Log.Error("Cannot restore state")
 		return err
 	}
 
 	// init API client
-	if err := core.initClient(CA); err != nil {
+	if err := ac.initClient(CA); err != nil {
 		return err
 	}
 
-	core.Log = logger
+	ac.Log = logger
 
 	return nil
 }

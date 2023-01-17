@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type Core struct {
+type AttestationClient struct {
 	// program info
 	ReleaseId *string
 
