@@ -25,8 +25,8 @@ func ReportMACAddresses(macs *api.MACAddresses) error {
 		// on Windows the WMI calls return their own errors which are
 		// mostly of no interest and just map to err-unknown here
 		macs.Error = common.ServeApiError(common.MapFSErrors(err))
-		log.Debug().Msgf("netif.ReportMACAddresses(): %s", err.Error())
-		log.Warn().Msgf("Failed to get MAC addresses")
+		log.Debug().Err(err).Msg("netif.ReportMACAddresses()")
+		log.Warn().Msg("Failed to get MAC addresses")
 		return err
 	}
 
@@ -48,8 +48,8 @@ func ReportNICs(nics *api.NICList) error {
 		// on Windows the WMI calls return their own errors which are
 		// mostly of no interest and just map to err-unknown here
 		nics.Error = common.ServeApiError(common.MapFSErrors(err))
-		log.Debug().Msgf("netif.ReportNICs(): %s", err.Error())
-		log.Warn().Msgf("Failed to get list of network cards")
+		log.Debug().Err(err).Msg("netif.ReportNICs()")
+		log.Warn().Msg("Failed to get list of network cards")
 		return err
 	}
 
@@ -64,8 +64,8 @@ func ReportNICs(nics *api.NICList) error {
 	ifas, err := net.Interfaces()
 	if err != nil {
 		nics.Error = common.ServeApiError(common.MapFSErrors(err))
-		log.Debug().Msgf("netif.ReportNICs(): %s", err.Error())
-		log.Warn().Msgf("Failed to get list of network cards")
+		log.Debug().Err(err).Msg("netif.ReportNICs()")
+		log.Warn().Msg("Failed to get list of network cards")
 		return err
 	}
 
@@ -86,7 +86,7 @@ func ReportNICs(nics *api.NICList) error {
 		addrs, err := ifa.Addrs()
 		if err != nil {
 			nic.Error = api.UnknownError
-			log.Debug().Msgf("netif.ReportNICs(): %s", err.Error())
+			log.Debug().Err(err).Msg("netif.ReportNICs()")
 		}
 		for _, addr := range addrs {
 			ipnet, ok := addr.(*net.IPNet)

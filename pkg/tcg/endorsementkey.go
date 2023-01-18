@@ -49,13 +49,13 @@ func (a *TCGAnchor) ReadEKCertificate() (*x509.Certificate, error) {
 func doReadEKCertificate(conn io.ReadWriteCloser, handle tpmutil.Handle) (*x509.Certificate, error) {
 	blob, err := tpm2.NVRead(conn, handle)
 	if err != nil {
-		log.Debug().Msgf("Cannot read EK certificate: %s", err)
+		log.Debug().Err(err).Msg("cannot read EK certificate")
 		return nil, err
 	}
 
 	certRef, err := x509.ParseCertificate(blob)
 	if err != nil {
-		log.Debug().Msgf("Cannot parse EK certificate: %s", err)
+		log.Debug().Err(err).Msg("cannot parse EK certificate")
 		return nil, err
 	}
 
@@ -74,7 +74,7 @@ func (a *TCGAnchor) GetEndorsementKey() (Handle, tpm2.Public, error) {
 			// Retry with default EK template
 			defaultEKHandle, ekPublic, err = generateAndLoadEK(a.Conn, nil)
 			if err != nil {
-				log.Debug().Msgf("Failed to load EK: %s. Tried to read EK template from 0x%x and to use the default EK template. Maybe the template it at a non-standard NV index?", err, defaultEKTemplateIndex)
+				log.Debug().Err(err).Msgf("tried to read EK template from 0x%x and to use the default EK template", defaultEKTemplateIndex)
 				return nil, tpm2.Public{}, err
 			}
 		}
@@ -96,26 +96,26 @@ func generateAndLoadEK(conn io.ReadWriteCloser, template *tpmutil.Handle) (tpmut
 	if template != nil {
 		tmpl, err := tpm2.NVRead(conn, *template)
 		if err != nil {
-			log.Debug().Msgf("Failed to fetch EK template: %v", err)
+			log.Debug().Err(err).Msg("Failed to fetch EK template: %v")
 			return handle, pub, err
 		}
 
 		pub, err = tpm2.DecodePublic(tmpl)
 		if err != nil {
-			log.Debug().Msgf("EK template is not a TPM2_PUBLIC: %v", err)
+			log.Debug().Err(err).Msg("EK template is not a TPM2_PUBLIC: %v")
 			return handle, pub, err
 		}
 	}
 
 	handle, _, err = tpm2.CreatePrimary(conn, tpm2.HandleEndorsement, tpm2.PCRSelection{}, "", "", defaultEKTemplate)
 	if err != nil {
-		log.Debug().Msgf("Failed to create EK: %v", err)
+		log.Debug().Err(err).Msg("Failed to create EK: %v")
 		return handle, pub, err
 	}
 
 	pub, _, _, err = tpm2.ReadPublic(conn, handle)
 	if err != nil {
-		log.Debug().Msgf("Failed to read EKs public part: %v", err)
+		log.Debug().Err(err).Msg("Failed to read EKs public part: %v")
 		return handle, pub, err
 	}
 

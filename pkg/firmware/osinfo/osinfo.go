@@ -15,8 +15,8 @@ func ReportOSInfo(osInfo *api.OS) error {
 	release, err := readOSReleasePrettyName()
 	if err != nil {
 		osInfo.Error = common.ServeApiError(common.MapFSErrors(err))
-		log.Debug().Msgf("osinfo.ReportOSInfo(): %s", err.Error())
-		log.Warn().Msgf("Failed to gather host informations")
+		log.Debug().Err(err).Msg("osinfo.ReportOSInfo()")
+		log.Warn().Msg("Failed to gather host informations")
 		return err
 	}
 	osInfo.Release = release
@@ -24,8 +24,8 @@ func ReportOSInfo(osInfo *api.OS) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		osInfo.Error = common.ServeApiError(common.MapFSErrors(err))
-		log.Debug().Msgf("osinfo.ReportOSInfo(): %s", err.Error())
-		log.Warn().Msgf("Failed to gather host informations")
+		log.Debug().Err(err).Msg("osinfo.ReportOSInfo()")
+		log.Warn().Msg("Failed to gather host informations")
 		return err
 	}
 	osInfo.Hostname = hostname

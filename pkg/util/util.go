@@ -39,13 +39,13 @@ func ZStdFile(file string) ([]byte, error) {
 func FileToHashBlob(file string) api.HashBlob {
 	digest, err := SHA256File(file)
 	if err != nil {
-		log.Debug().Msgf("util.SHA256File(): %s %s", file, err.Error())
+		log.Debug().Err(err).Msgf("util.SHA256File(%s)", file)
 		return api.HashBlob{Error: common.ServeApiError(common.MapFSErrors(err))}
 	}
 
 	zData, err := ZStdFile(file)
 	if err != nil {
-		log.Debug().Msgf("util.ZStdFile(): %s %s", file, err.Error())
+		log.Debug().Err(err).Msgf("util.ZStdFile(%s)", file)
 		return api.HashBlob{Error: common.ServeApiError(common.MapFSErrors(err))}
 	}
 

@@ -16,7 +16,7 @@ func reportUEFIVariable(variable *api.UEFIVariable) error {
 	val, err := readUEFIVariable(variable.Name, variable.Vendor)
 	if err != nil {
 		variable.Error = common.ServeApiError(common.MapFSErrors(err))
-		log.Debug().Msgf("uefivars.ReportUEFIVariable(): %s", err.Error())
+		log.Debug().Err(err).Msg("uefivars.ReportUEFIVariable()")
 		return err
 	}
 
@@ -44,7 +44,7 @@ func ReportUEFIVariables(variables []api.UEFIVariable) (err error) {
 		allFailed = allFailed && err != nil
 	}
 	if allFailed && len(variables) > 0 {
-		log.Warn().Msgf("Failed to access UEFI variables")
+		log.Warn().Msg("Failed to access UEFI variables")
 		return
 	}
 	err = nil

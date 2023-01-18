@@ -17,8 +17,8 @@ func ReportTPM2EventLog(eventlog *api.ErrorBuffer, conn io.ReadWriteCloser) erro
 
 	buf, err := readTPM2EventLog(conn)
 	if err != nil {
-		log.Debug().Msgf("srtmlog.ReportTPM2EventLog(): %s", err.Error())
-		log.Warn().Msgf("Failed to read TPM 2.0 event log")
+		log.Debug().Err(err).Msg("srtmlog.ReportTPM2EventLog()")
+		log.Warn().Msg("Failed to read TPM 2.0 event log")
 		//XXX map tpmutil errors
 		eventlog.Error = common.ServeApiError(mapErrors(common.MapFSErrors(err)))
 		return err
@@ -39,8 +39,8 @@ func ReportPCPQuoteKeys() (map[string]api.Buffer, error) {
 	quoteKeys := make(map[string]api.Buffer)
 	names, blobs, err := PCPQuoteKeys()
 	if err != nil {
-		log.Debug().Msgf("srtmlog.PCPQuoteKeys(): %s", err.Error())
-		log.Warn().Msgf("Failed to read PCP quote keys")
+		log.Debug().Err(err).Msg("srtmlog.PCPQuoteKeys()")
+		log.Warn().Msg("Failed to read PCP quote keys")
 	} else if len(names) == len(blobs) && len(names) > 0 {
 		for i, name := range names {
 			quoteKeys[name] = blobs[i]

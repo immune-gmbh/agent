@@ -20,11 +20,12 @@ func (attest *attestCmd) Run(agentCore *core.AttestationClient) error {
 	ctx := context.Background()
 
 	if !agentCore.State.IsEnrolled() {
-		log.Error().Msgf("No previous state found, please enroll first.")
+		log.Error().Msg("No previous state found, please enroll first.")
 		return errors.New("no-state")
 	}
 
 	if err := agentCore.OpenTPM(); err != nil {
+		log.Error().Msgf("Cannot open TPM: %s", agentCore.State.TPM)
 		return err
 	}
 
@@ -34,6 +35,30 @@ func (attest *attestCmd) Run(agentCore *core.AttestationClient) error {
 func doAttest(agentCore *core.AttestationClient, ctx context.Context, dumpReportTo string, dryRun bool) error {
 	appraisal, webLink, err := agentCore.Attest(ctx, dumpReportTo, dryRun)
 	if err != nil {
+		if errors.Is(err, api.AuthError) {
+			log.Error().Msg("Failed attestation with an authentication error. Please enroll again.")
+		} else if errors.Is(err, api.FormatError) {
+			log.Error().Msg("Attestation failed. The server rejected our request. Make sure the agent is up to date.")
+		} else if errors.Is(err, api.NetworkError) {
+			log.Error().Msg("Attestation failed. Cannot contact the immune Guard server. Make sure you're connected to the internet.")
+		} else if errors.Is(err, api.ServerError) {
+			log.Error().Msg("Attestation failed. The immune Guard server failed to process the request. Please try again later.")
+		} else if errors.Is(err, api.PaymentError) {
+			log.Error().Msg("Attestation failed. A payment is required to use the attestation service.")
+		} else if errors.Is(err, core.ErrEncodeJson) {
+			log.Error().Msg("Internal error while encoding firmware state.")
+		} else if errors.Is(err, core.ErrReadPcr) {
+			log.Error().Msg("Failed to read all PCR values.")
+		} else if errors.Is(err, core.ErrRootKey) {
+			log.Error().Msg("Failed to create or load root key.")
+		} else if errors.Is(err, core.ErrAik) {
+			log.Error().Msg("No key suitable for attestation found, please enroll first.")
+		} else if errors.Is(err, core.ErrQuote) {
+			log.Error().Msg("TPM 2.0 attestation failed.")
+		} else if err != nil {
+			log.Error().Msg("Attestation failed. An unknown error occured. Please try again later.")
+		}
+
 		tui.SetUIState(tui.StAttestationFailed)
 		return err
 	}
@@ -42,7 +67,7 @@ func doAttest(agentCore *core.AttestationClient, ctx context.Context, dumpReport
 
 	if inProgress {
 		tui.SetUIState(tui.StAttestationRunning)
-		log.Info().Msgf("Attestation in progress, results become available later")
+		log.Info().Msg("Attestation in progress, results become available later")
 		tui.ShowAppraisalLink(webLink)
 		if webLink != "" {
 			log.Info().Msgf("See detailed results here: %s", webLink)
@@ -50,7 +75,7 @@ func doAttest(agentCore *core.AttestationClient, ctx context.Context, dumpReport
 		return nil
 	} else {
 		tui.SetUIState(tui.StAttestationSuccess)
-		log.Info().Msgf("Attestation successful")
+		log.Info().Msg("Attestation successful")
 	}
 
 	if dryRun {

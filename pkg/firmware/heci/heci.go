@@ -64,11 +64,11 @@ func ReportMECommands(commands []api.MEClientCommands) (err error) {
 		allFailed = allFailed && err != nil
 		if err != nil {
 			v.Error = common.ServeApiError(common.MapFSErrors(err))
-			log.Debug().Msgf("heci.ReportMECommands(): %s", err.Error())
+			log.Debug().Err(err).Msg("heci.ReportMECommands()")
 		}
 	}
 	if allFailed && len(commands) > 0 {
-		log.Warn().Msgf("Failed to contact Intel ME")
+		log.Warn().Msg("Failed to contact Intel ME")
 		return
 	}
 

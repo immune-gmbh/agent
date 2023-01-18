@@ -35,9 +35,8 @@ func NewCore() *AttestationClient {
 func (ac *AttestationClient) OpenTPM() error {
 	a, err := tcg.OpenTPM(ac.State.TPM, ac.State.StubState)
 	if err != nil {
-		ac.Log.Debug().Msgf("tcg.OpenTPM(glob.State.TPM, glob.State.StubState): %s", err.Error())
-		ac.Log.Error().Msgf("Cannot open TPM: %s", ac.State.TPM)
-		return err
+		ac.Log.Debug().Err(err).Msg("tcg.OpenTPM(glob.State.TPM, glob.State.StubState)")
+		return ErrOpenTrustAnchor
 	}
 
 	ac.Anchor = a
@@ -48,22 +47,20 @@ func (ac *AttestationClient) OpenTPM() error {
 func (ac *AttestationClient) initState(stateDir string) error {
 	// stateDir is either the OS-specific default or what we get from the CLI
 	if stateDir == "" {
-		ac.Log.Error().Msg("No state directory specified")
-		return errors.New("state parameter empty")
+		ac.Log.Debug().Msg("no state directory specified")
+		return ErrStateDir
 	}
 
 	// test if the state directory is writable
 	{
 		err := os.MkdirAll(stateDir, os.ModeDir|0750)
 		if err != nil {
-			ac.Log.Error().Msgf("Can't create state directory, check permissions: %s", stateDir)
-			return err
+			return ErrStateDir
 		}
 		tmp := filepath.Join(stateDir, "testfile")
 		fd, err := os.Create(tmp)
 		if err != nil {
-			ac.Log.Error().Msgf("Can't write in state directory, check permissions: %s", stateDir)
-			return err
+			return ErrStateDir
 		}
 		fd.Close()
 		os.Remove(tmp)
@@ -77,19 +74,19 @@ func (ac *AttestationClient) initState(stateDir string) error {
 		ac.Log.Info().Msg("No previous state found")
 		ac.State = state.NewState()
 	} else if errors.Is(err, state.ErrNoPerm) {
-		ac.Log.Error().Msg("Cannot read state, no permissions")
 		return err
 	} else if err != nil {
-		ac.Log.Debug().Msgf("state.LoadState(%s): %s", ac.StatePath, err)
-		return err
+		ac.Log.Debug().Err(err).Msgf("state.LoadState(%s)", ac.StatePath)
+		return ErrStateLoad
 	} else {
 		ac.State = st
 	}
+
 	if update {
-		ac.Log.Debug().Msgf("Migrating state file to newest version")
+		ac.Log.Info().Msg("Migrating state file to newest version")
 		if err := ac.State.Store(ac.StatePath); err != nil {
-			ac.Log.Debug().Msgf("Store(%s): %s", ac.StatePath, err)
-			return err
+			ac.Log.Debug().Err(err).Msgf("State.Store(%s)", ac.StatePath)
+			return ErrStateStore
 		}
 	}
 
@@ -101,8 +98,8 @@ func (ac *AttestationClient) initClient(CA string) error {
 	if CA != "" {
 		buf, err := os.ReadFile(CA)
 		if err != nil {
-			ac.Log.Error().Msgf("Cannot read '%s': %s", CA, err.Error())
-			return err
+			ac.Log.Debug().Err(err).Msgf("Cannot read: %s", CA)
+			return ErrCaFile
 		}
 
 		if pem, _ := pem.Decode(buf); pem != nil {
@@ -111,8 +108,8 @@ func (ac *AttestationClient) initClient(CA string) error {
 
 		caCert, err = x509.ParseCertificate(buf)
 		if err != nil {
-			ac.Log.Error().Msgf("CA certificate ill-formed: %s", err.Error())
-			return err
+			ac.Log.Debug().Err(err).Msgf("CA certificate ill-formed")
+			return ErrCaFile
 		}
 	}
 
@@ -139,17 +136,16 @@ func (ac *AttestationClient) initClient(CA string) error {
 func (ac *AttestationClient) UpdateConfig() error {
 	update, err := ac.State.EnsureFresh(&ac.Client)
 	if err != nil {
-		ac.Log.Debug().Msgf("Fetching fresh config: %s", err)
-		ac.Log.Error().Msg("Failed to load configuration from server")
-		return err
+		ac.Log.Debug().Err(err).Msg("fetching fresh config")
+		return ErrUpdateConfig
 	}
 
 	// store it on-disk
 	if update {
-		ac.Log.Debug().Msgf("Storing new config from server")
+		ac.Log.Info().Msg("Storing new config from server")
 		if err := ac.State.Store(ac.StatePath); err != nil {
-			ac.Log.Debug().Msgf("Store(%s): %s", ac.StatePath, err)
-			return err
+			ac.Log.Debug().Err(err).Msgf("State.Store(%s)", ac.StatePath)
+			return ErrStateStore
 		}
 	}
 
@@ -162,7 +158,6 @@ func (ac *AttestationClient) Init(stateDir, CA string, server *url.URL, logger *
 
 	// load on-disk state
 	if err := ac.initState(stateDir); err != nil {
-		ac.Log.Error().Msg("Cannot restore state")
 		return err
 	}
 

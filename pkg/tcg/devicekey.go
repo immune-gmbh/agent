@@ -62,7 +62,7 @@ func (a *TCGAnchor) CreateAndLoadRoot(endorsementAuth string, rootAuth string, t
 		a.Conn, tpm2.HandleEndorsement, tpm2.PCRSelection{}, endorsementAuth,
 		rootAuth, tpm2.Public(public))
 	if err != nil {
-		log.Debug().Msgf("Failed to create device key: %s", err)
+		log.Debug().Err(err).Msg("failed to create device key")
 		return nil, public, err
 	}
 
@@ -108,13 +108,13 @@ func (a *TCGAnchor) CreateAndCertifyDeviceKey(rootHandle Handle, rootAuth string
 	privBlob, pubBlob, _, hash, ticket, err := tpm2.CreateKeyWithOutsideInfo(
 		a.Conn, rootH, tpm2.PCRSelection{}, rootAuth, authValue, tpm2.Public(template.Public), []byte(template.Label))
 	if err != nil {
-		log.Debug().Msgf("Failed to create device key: %s", err)
+		log.Debug().Err(err).Msg("failed to create device key")
 		return api.Key{}, api.Buffer{}, err
 	}
 
 	pub, err := tpm2.DecodePublic(pubBlob)
 	if err != nil {
-		log.Debug().Msgf("Failed to decode public area of the newly created key: %s", err)
+		log.Debug().Err(err).Msg("failed to decode public area of the newly created key")
 		return api.Key{}, api.Buffer{}, err
 	}
 
@@ -140,7 +140,7 @@ func (a *TCGAnchor) CreateAndCertifyDeviceKey(rootHandle Handle, rootAuth string
 	// load the key into the TPM
 	handle, _, err := tpm2.Load(a.Conn, rootH, rootAuth, pubBlob, privBlob)
 	if err != nil {
-		log.Debug().Msgf("Failed to load key after creation: %s", err)
+		log.Debug().Err(err).Msg("failed to load key after creation")
 		return api.Key{}, api.Buffer{}, err
 	}
 
@@ -148,19 +148,19 @@ func (a *TCGAnchor) CreateAndCertifyDeviceKey(rootHandle Handle, rootAuth string
 	attestBlob, sigData, err := tpm2.CertifyCreation(a.Conn, authValue, handle, handle, []byte{}, hash, scheme, ticket)
 	tpm2.FlushContext(a.Conn, handle)
 	if err != nil {
-		log.Debug().Msgf("Failed to attest key creation: %s", err)
+		log.Debug().Err(err).Msg("failed to attest key creation")
 		return api.Key{}, api.Buffer{}, err
 	}
 
 	// decode attestation structure
 	attestRef, err := tpm2.DecodeAttestationData(attestBlob)
 	if err != nil {
-		log.Debug().Msgf("Failed to decode newly created attestation data: %s", err)
+		log.Debug().Err(err).Msg("failed to decode newly created attestation data")
 		return api.Key{}, api.Buffer{}, err
 	}
 	sigRef, err := tpm2.DecodeSignature(bytes.NewBuffer(sigData))
 	if err != nil {
-		log.Debug().Msgf("Failed to decode newly created attestation signature: %s", err)
+		log.Debug().Err(err).Msg("failed to decode newly created attestation signature")
 		return api.Key{}, api.Buffer{}, err
 	}
 
@@ -185,7 +185,7 @@ func (a *TCGAnchor) LoadDeviceKey(rootHandle Handle, rootAuth string, public api
 	// load the key into the TPM
 	handle, _, err := tpm2.Load(a.Conn, rootH, rootAuth, blob, private)
 	if err != nil {
-		log.Debug().Msgf("Failed to load key: %s", err)
+		log.Debug().Err(err).Msg("failed to load key")
 	}
 
 	return &TCGHandle{Handle: handle}, err

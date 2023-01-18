@@ -289,7 +289,7 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		log.Debug().Msgf("HTTP response: %s", err)
+		log.Debug().Err(err).Msg("HTTP response")
 		return nil, NetworkError
 	}
 	defer resp.Body.Close()
@@ -341,7 +341,7 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 		respBytes, err := io.ReadAll(resp.Body)
 		log.Debug().Msgf("HTTP body: %s", string(respBytes)) // always try to print anything we got
 		if err != nil {
-			log.Debug().Msgf("Reading server response: %s", err)
+			log.Debug().Err(err).Msg("reading server response")
 			return nil, NetworkError
 		}
 
@@ -366,7 +366,7 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 		if err = json.Unmarshal(respBytes, &one); err != nil {
 			var many jsonapi.ManyPayload
 			if err = json.Unmarshal(respBytes, &many); err != nil {
-				log.Debug().Msgf("Parsing server response: %s", err)
+				log.Debug().Err(err).Msg("parsing server response")
 				return nil, ServerError
 			} else {
 				return &many, retErr

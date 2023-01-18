@@ -12,8 +12,8 @@ func ReportACPITables(acpiTables *api.ACPITables) error {
 	t, err := readACPITables()
 	if err != nil {
 		acpiTables.Error = common.ServeApiError(common.MapFSErrors(err))
-		log.Debug().Msgf("acpi.ReadACPITables(): %s", err.Error())
-		log.Warn().Msgf("Failed to get ACPI tables")
+		log.Debug().Err(err).Msg("acpi.ReadACPITables()")
+		log.Warn().Msg("Failed to get ACPI tables")
 		return err
 	}
 	// map map to cast []byte to api.Buffer

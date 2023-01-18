@@ -43,8 +43,8 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	// Get ourselves windows security permissions to read UEFI vars
 	err := util.WinAddTokenPrivilege("SeSystemEnvironmentPrivilege")
 	if err != nil {
-		log.Debug().Msgf("util.WinAddTokenPrivilege(): %s", err.Error())
-		log.Warn().Msgf("Failed to get windows security permissions to read UEFI variables")
+		log.Debug().Err(err).Msg("util.WinAddTokenPrivilege()")
+		log.Warn().Msg("Failed to get windows security permissions to read UEFI variables")
 	}
 
 	// stop cpu driver once before it is used to ensure we always load a fresh version
@@ -56,8 +56,8 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	immunecpu.RemoveService()
 	err = immunecpu.CreateService()
 	if err != nil {
-		log.Debug().Msgf("immunecpu.CreateService(): %s", err.Error())
-		log.Warn().Msgf("Failed to install immune Guard reporting driver")
+		log.Debug().Err(err).Msg("immunecpu.CreateService()")
+		log.Warn().Msg("Failed to install immune Guard reporting driver")
 	}
 
 	// clean up every time
@@ -180,13 +180,13 @@ func ReportTPM2Properties(properties []api.TPM2Property, tpmConn io.ReadWriteClo
 			allFailed = allFailed && err != nil
 			if err != nil {
 				v.Error = common.ServeApiError(err)
-				log.Debug().Msgf("tcg.Property(): %s", err.Error())
+				log.Debug().Err(err).Msg("tcg.Property()")
 			} else {
 				v.Value = &val
 			}
 		}
 		if allFailed && len(properties) > 0 {
-			log.Warn().Msgf("Failed to get TPM 2.0 properties")
+			log.Warn().Msg("Failed to get TPM 2.0 properties")
 			return
 		}
 		err = nil
@@ -204,7 +204,7 @@ func ReportAgentHash(agentInfo *api.Agent) (err error) {
 	defer func() {
 		if err != nil {
 			agentInfo.ImageSHA2.Error = common.ServeApiError(common.MapFSErrors(err))
-			log.Debug().Msgf("firmware.ReportAgentHash(): %s", err.Error())
+			log.Debug().Err(err).Msg("firmware.ReportAgentHash()")
 			log.Warn().Msg("Failed to compute executable image hash")
 		}
 	}()

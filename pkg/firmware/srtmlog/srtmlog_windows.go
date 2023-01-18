@@ -282,12 +282,12 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 	// this is more reliable than getAllTCGLogs() and more complete than GetTCGLog()
 	logs, err := getAllWBCLLogsFromDisk()
 	if err != nil {
-		log.Debug().Msgf("srtmlog.getAllWBCLLogsFromDisk(): failed to get WBCLs from disk, falling back to API: %v", err)
+		log.Debug().Err(err).Msg("srtmlog.getAllWBCLLogsFromDisk(): failed to get WBCLs from disk, falling back to API: %v")
 
 		// try to use API functions as fallback
 		logs, err = readTPM2EventLogWinApi(conn)
 		if err != nil {
-			log.Debug().Msgf("srtmlog.readTPM2EventLogWinApi(): failed to get WBCLs from API, falling back to registry key: %v", err)
+			log.Debug().Err(err).Msg("srtmlog.readTPM2EventLogWinApi(): failed to get WBCLs from API, falling back to registry key: %v")
 
 			// try getting current WBCL from registry as fallback
 			return readTPM2EventLogRegistry()

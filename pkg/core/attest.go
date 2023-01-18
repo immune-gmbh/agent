@@ -25,7 +25,7 @@ func (ac *AttestationClient) readAllPCRBanks(ctx context.Context) ([]int, map[st
 	// read all PCRs
 	allPCRs, err := ac.Anchor.AllPCRValues()
 	if err != nil {
-		ac.Log.Debug().Msgf("tcg.AllPCRValues(): %s", err.Error())
+		ac.Log.Debug().Err(err).Msg("tcg.AllPCRValues()")
 		return nil, nil, err
 	}
 
@@ -39,8 +39,7 @@ func (ac *AttestationClient) readAllPCRBanks(ctx context.Context) ([]int, map[st
 		for strpcr := range bank {
 			pcr, err := strconv.Atoi(strpcr)
 			if err != nil {
-				ac.Log.Debug().Msgf("strconv.Atoi(): %s", err.Error())
-				ac.Log.Error().Msg("Failed to parse PCR index")
+				ac.Log.Debug().Err(err).Msg("strconv.Atoi()")
 				return nil, nil, err
 			}
 			if pcr < 32 {
@@ -78,19 +77,19 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	// transform firmware info into json and crypto-safe canonical json representations
 	fwPropsJSON, err := json.Marshal(fwProps)
 	if err != nil {
-		ac.Log.Debug().Msgf("json.Marshal(FirmwareProperties): %s", err.Error())
+		ac.Log.Debug().Err(err).Msg("json.Marshal(FirmwareProperties)")
 		return nil, "", ErrEncodeJson
 	}
 	fwPropsJCS, err := jcs.Transform(fwPropsJSON)
 	if err != nil {
-		ac.Log.Debug().Msgf("jcs.Transform(FirmwareProperties): %s", err.Error())
+		ac.Log.Debug().Err(err).Msg("jcs.Transform(FirmwareProperties)")
 		return nil, "", ErrEncodeJson
 	}
 	fwPropsHash := sha256.Sum256(fwPropsJCS)
 
 	toQuote, allPCRs, err := ac.readAllPCRBanks(ctx)
 	if err != nil {
-		ac.Log.Debug().Msgf("readAllPCRBanks(): %s", err.Error())
+		ac.Log.Debug().Err(err).Msg("readAllPCRBanks()")
 		return nil, "", ErrReadPcr
 	}
 
@@ -99,8 +98,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	ac.Log.Info().Msg("Signing attestation data")
 	rootHandle, rootPub, err := ac.Anchor.CreateAndLoadRoot(ac.EndorsementAuth, ac.State.Root.Auth, &ac.State.Config.Root.Public)
 	if err != nil {
-		ac.Log.Debug().Msgf("tcg.CreateAndLoadRoot(..): %s", err.Error())
-		ac.Log.Error().Msg("Failed to create root key")
+		ac.Log.Debug().Err(err).Msg("tcg.CreateAndLoadRoot(..)")
 		return nil, "", ErrRootKey
 	}
 	defer rootHandle.Flush(ac.Anchor)
@@ -108,27 +106,23 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	// make sure we're on the right TPM
 	rootName, err := api.ComputeName(rootPub)
 	if err != nil {
-		ac.Log.Debug().Msgf("Name(rootPub): %s", err)
-		ac.Log.Error().Msg("Internal error while vetting root key. This is a bug, please report it to bugs@immu.ne.")
+		ac.Log.Debug().Err(err).Msg("Name(rootPub)")
 		return nil, "", ErrRootKey
 	}
 
 	// check the root name. this will change if the endorsement proof value is changed
 	if !api.EqualNames(&rootName, &ac.State.Root.Name) {
-		ac.Log.Error().Msg("Failed to recreate enrolled root key. Your TPM was reset, please enroll again.")
 		return nil, "", ErrRootKey
 	}
 
 	// load AIK
 	aik, ok := ac.State.Keys["aik"]
 	if !ok {
-		ac.Log.Error().Msgf("No key suitable for attestation found, please enroll first.")
 		return nil, "", ErrAik
 	}
 	aikHandle, err := ac.Anchor.LoadDeviceKey(rootHandle, ac.State.Root.Auth, aik.Public, aik.Private)
 	if err != nil {
-		ac.Log.Debug().Msgf("LoadDeviceKey(..): %s", err)
-		ac.Log.Error().Msg("Failed to load AIK")
+		ac.Log.Debug().Err(err).Msg("LoadDeviceKey(..)")
 		return nil, "", ErrAik
 	}
 	defer aikHandle.Flush(ac.Anchor)
@@ -139,8 +133,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	for k := range allPCRs {
 		alg, err := strconv.ParseInt(k, 10, 16)
 		if err != nil {
-			ac.Log.Debug().Msgf("ParseInt failed: %s", err)
-			ac.Log.Error().Msg("Invalid PCR bank selector")
+			ac.Log.Debug().Err(err).Msg("ParseInt failed")
 			return nil, "", ErrQuote
 		}
 		algs = append(algs, tpm2.Algorithm(alg))
@@ -150,13 +143,13 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	ac.Log.Trace().Msg("generate quote")
 	quote, sig, err := ac.Anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuote)
 	if err != nil || (sig.ECC == nil && sig.RSA == nil) {
-		ac.Log.Debug().Msgf("TPM2_Quote failed: %s", err)
-		ac.Log.Error().Msg("TPM 2.0 attestation failed")
+		ac.Log.Debug().Err(err).Msg("TPM2_Quote failed")
 		return nil, "", ErrQuote
 	}
 	aikHandle.Flush(ac.Anchor)
 
 	// fetch the runtime measurment log
+	//XXX 1) should only run on linux 2) must check errors 3) is placed here because fw report can't report data that should be omitted from quote and b/c this data is part of PCRs anyway
 	fwProps.IMALog = new(api.ErrorBuffer)
 	ima.ReportIMALog(fwProps.IMALog)
 
@@ -174,7 +167,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 
 	evidenceJSON, err := json.Marshal(evidence)
 	if err != nil {
-		ac.Log.Debug().Msgf("json.Marshal(Evidence): %s", err.Error())
+		ac.Log.Debug().Err(err).Msg("json.Marshal(Evidence)")
 		return nil, "", ErrEncodeJson
 	}
 
@@ -197,27 +190,20 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	tui.SetUIState(tui.StSendEvidence)
 	ac.Log.Info().Msg("Sending report to immune Guard cloud")
 	attestResp, webLink, err := ac.Client.Attest(ctx, aik.Credential, evidence)
+	if err != nil {
+		ac.Log.Debug().Err(err).Msg("client.Attest(..)")
 
-	// pass-through API errors and replace all others with ErrUnknown
-	if errors.Is(err, api.AuthError) {
-		ac.Log.Error().Msg("Failed attestation with an authentication error. Please enroll again.")
+		// pass-through API errors and replace all others with ErrUnknown
+		if !(errors.Is(err, api.AuthError) ||
+			errors.Is(err, api.FormatError) ||
+			errors.Is(err, api.NetworkError) ||
+			errors.Is(err, api.ServerError) ||
+			errors.Is(err, api.PaymentError)) {
+			err = ErrUnknown
+		}
+
 		return nil, "", err
-	} else if errors.Is(err, api.FormatError) {
-		ac.Log.Error().Msg("Attestation failed. The server rejected our request. Make sure the agent is up to date.")
-		return nil, "", err
-	} else if errors.Is(err, api.NetworkError) {
-		ac.Log.Error().Msg("Attestation failed. Cannot contact the immune Guard server. Make sure you're connected to the internet.")
-		return nil, "", err
-	} else if errors.Is(err, api.ServerError) {
-		ac.Log.Error().Msg("Attestation failed. The immune Guard server failed to process the request. Please try again later.")
-		return nil, "", err
-	} else if errors.Is(err, api.PaymentError) {
-		ac.Log.Error().Msg("Attestation failed. A payment is required to use the attestation service.")
-		return nil, "", err
-	} else if err != nil {
-		ac.Log.Error().Msg("Attestation failed. An unknown error occured. Please try again later.")
-		ac.Log.Debug().Msgf("client.Attest(..): %s", err.Error())
-		return nil, "", ErrUnknown
 	}
+
 	return attestResp, webLink, nil
 }
