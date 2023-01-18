@@ -72,31 +72,26 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	// collect firmware info
 	tui.SetUIState(tui.StCollectFirmwareInfo)
 	ac.Log.Info().Msg("Collecting firmware info")
-	fwProps, err := firmware.GatherFirmwareData(conn, &ac.State.Config)
-	if err != nil {
-		ac.Log.Warn().Msgf("Failed to gather firmware state")
-		fwProps = api.FirmwareProperties{}
-	}
+	fwProps := firmware.GatherFirmwareData(conn, &ac.State.Config)
 	fwProps.Agent.Release = *ac.ReleaseId
 
 	// transform firmware info into json and crypto-safe canonical json representations
 	fwPropsJSON, err := json.Marshal(fwProps)
 	if err != nil {
 		ac.Log.Debug().Msgf("json.Marshal(FirmwareProperties): %s", err.Error())
-		ac.Log.Fatalf("Internal error while encoding firmware state. This is a bug, please report it to bugs@immu.ne.")
+		return nil, "", ErrEncodeJson
 	}
 	fwPropsJCS, err := jcs.Transform(fwPropsJSON)
 	if err != nil {
 		ac.Log.Debug().Msgf("jcs.Transform(FirmwareProperties): %s", err.Error())
-		ac.Log.Fatalf("Internal error while encoding firmware state. This is a bug, please report it to bugs@immu.ne.")
+		return nil, "", ErrEncodeJson
 	}
 	fwPropsHash := sha256.Sum256(fwPropsJCS)
 
 	toQuote, allPCRs, err := ac.readAllPCRBanks(ctx)
 	if err != nil {
 		ac.Log.Debug().Msgf("readAllPCRBanks(): %s", err.Error())
-		ac.Log.Error().Msg("Failed to read all PCR values")
-		return nil, "", err
+		return nil, "", ErrReadPcr
 	}
 
 	// load Root key
@@ -106,7 +101,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	if err != nil {
 		ac.Log.Debug().Msgf("tcg.CreateAndLoadRoot(..): %s", err.Error())
 		ac.Log.Error().Msg("Failed to create root key")
-		return nil, "", err
+		return nil, "", ErrRootKey
 	}
 	defer rootHandle.Flush(ac.Anchor)
 
@@ -115,26 +110,26 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	if err != nil {
 		ac.Log.Debug().Msgf("Name(rootPub): %s", err)
 		ac.Log.Error().Msg("Internal error while vetting root key. This is a bug, please report it to bugs@immu.ne.")
-		return nil, "", err
+		return nil, "", ErrRootKey
 	}
 
 	// check the root name. this will change if the endorsement proof value is changed
 	if !api.EqualNames(&rootName, &ac.State.Root.Name) {
 		ac.Log.Error().Msg("Failed to recreate enrolled root key. Your TPM was reset, please enroll again.")
-		return nil, "", errors.New("root name changed")
+		return nil, "", ErrRootKey
 	}
 
 	// load AIK
 	aik, ok := ac.State.Keys["aik"]
 	if !ok {
 		ac.Log.Error().Msgf("No key suitable for attestation found, please enroll first.")
-		return nil, "", errors.New("no-aik")
+		return nil, "", ErrAik
 	}
 	aikHandle, err := ac.Anchor.LoadDeviceKey(rootHandle, ac.State.Root.Auth, aik.Public, aik.Private)
 	if err != nil {
 		ac.Log.Debug().Msgf("LoadDeviceKey(..): %s", err)
 		ac.Log.Error().Msg("Failed to load AIK")
-		return nil, "", err
+		return nil, "", ErrAik
 	}
 	defer aikHandle.Flush(ac.Anchor)
 	rootHandle.Flush(ac.Anchor)
@@ -146,7 +141,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 		if err != nil {
 			ac.Log.Debug().Msgf("ParseInt failed: %s", err)
 			ac.Log.Error().Msg("Invalid PCR bank selector")
-			return nil, "", err
+			return nil, "", ErrQuote
 		}
 		algs = append(algs, tpm2.Algorithm(alg))
 	}
@@ -157,7 +152,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	if err != nil || (sig.ECC == nil && sig.RSA == nil) {
 		ac.Log.Debug().Msgf("TPM2_Quote failed: %s", err)
 		ac.Log.Error().Msg("TPM 2.0 attestation failed")
-		return nil, "", err
+		return nil, "", ErrQuote
 	}
 	aikHandle.Flush(ac.Anchor)
 
@@ -180,9 +175,10 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	evidenceJSON, err := json.Marshal(evidence)
 	if err != nil {
 		ac.Log.Debug().Msgf("json.Marshal(Evidence): %s", err.Error())
-		ac.Log.Fatalf("Internal error while encoding firmware state. This is a bug, please report it to bugs@immu.ne.")
+		return nil, "", ErrEncodeJson
 	}
 
+	// XXX this should be handled outside of attest
 	if dumpEvidenceTo == "-" {
 		fmt.Println(string(evidenceJSON))
 	} else if dumpEvidenceTo != "" {
@@ -201,7 +197,8 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	tui.SetUIState(tui.StSendEvidence)
 	ac.Log.Info().Msg("Sending report to immune Guard cloud")
 	attestResp, webLink, err := ac.Client.Attest(ctx, aik.Credential, evidence)
-	// HTTP-level errors
+
+	// pass-through API errors and replace all others with ErrUnknown
 	if errors.Is(err, api.AuthError) {
 		ac.Log.Error().Msg("Failed attestation with an authentication error. Please enroll again.")
 		return nil, "", err
@@ -220,7 +217,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	} else if err != nil {
 		ac.Log.Error().Msg("Attestation failed. An unknown error occured. Please try again later.")
 		ac.Log.Debug().Msgf("client.Attest(..): %s", err.Error())
-		return nil, "", err
+		return nil, "", ErrUnknown
 	}
 	return attestResp, webLink, nil
 }

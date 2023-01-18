@@ -13,6 +13,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -125,7 +126,8 @@ func (ac *AttestationClient) initClient(CA string) error {
 		var err error
 		srv, err = url.Parse(defaultServerURL)
 		if err != nil {
-			ac.Log.Fatal().Msg("default server URL is invalid")
+			log.Debug().Msg("default server URL is invalid")
+			return ErrApiUrl
 		}
 	}
 
