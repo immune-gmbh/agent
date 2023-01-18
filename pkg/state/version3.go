@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 )
@@ -62,7 +62,7 @@ func migrateStateV2(raw []byte) (*StateV3, error) {
 	var st2 StateV2
 
 	if err := json.Unmarshal(raw, &st2); err != nil {
-		log.Debugf("State file corrupted: %s", err)
+		log.Debug().Msgf("State file corrupted: %s", err)
 		return nil, ErrInvalid
 	}
 

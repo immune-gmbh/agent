@@ -8,7 +8,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 type attestCmd struct {
@@ -20,7 +20,7 @@ func (attest *attestCmd) Run(agentCore *core.AttestationClient) error {
 	ctx := context.Background()
 
 	if !agentCore.State.IsEnrolled() {
-		logrus.Errorf("No previous state found, please enroll first.")
+		log.Error().Msgf("No previous state found, please enroll first.")
 		return errors.New("no-state")
 	}
 
@@ -42,15 +42,15 @@ func doAttest(agentCore *core.AttestationClient, ctx context.Context, dumpReport
 
 	if inProgress {
 		tui.SetUIState(tui.StAttestationRunning)
-		logrus.Infof("Attestation in progress, results become available later")
+		log.Info().Msgf("Attestation in progress, results become available later")
 		tui.ShowAppraisalLink(webLink)
 		if webLink != "" {
-			logrus.Infof("See detailed results here: %s", webLink)
+			log.Info().Msgf("See detailed results here: %s", webLink)
 		}
 		return nil
 	} else {
 		tui.SetUIState(tui.StAttestationSuccess)
-		logrus.Infof("Attestation successful")
+		log.Info().Msgf("Attestation successful")
 	}
 
 	if dryRun {
@@ -88,11 +88,11 @@ func doAttest(agentCore *core.AttestationClient, ctx context.Context, dumpReport
 
 	tui.ShowAppraisalLink(webLink)
 	if webLink != "" {
-		logrus.Infof("See detailed results here: %s", webLink)
+		log.Info().Msgf("See detailed results here: %s", webLink)
 	}
 
 	if appraisal, err := json.MarshalIndent(*appraisal, "", "  "); err == nil {
-		logrus.Debugln(string(appraisal))
+		log.Debug().Msg(string(appraisal))
 	}
 
 	return nil

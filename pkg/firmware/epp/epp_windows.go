@@ -4,11 +4,11 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 	"github.com/immune-gmbh/agent/v3/pkg/util"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 func ReportEPP(eppInfo *api.EPPInfo) error {
-	logrus.Traceln("ReportEPP()")
+	log.Trace().Msg("ReportEPP()")
 
 	elamDrivers, err := ListElamDriverPaths()
 	if err == nil {
@@ -18,7 +18,7 @@ func ReportEPP(eppInfo *api.EPPInfo) error {
 		}
 	} else {
 		eppInfo.EarlyLaunchDriversErr = common.ServeApiError(common.MapFSErrors(err))
-		logrus.Debugf("epp.ListElamDriverPaths(): %s", err.Error())
+		log.Debug().Msgf("epp.ListElamDriverPaths(): %s", err.Error())
 	}
 
 	pplImages, err := ListPPLProcessImagePaths()
@@ -29,7 +29,7 @@ func ReportEPP(eppInfo *api.EPPInfo) error {
 		}
 	} else {
 		eppInfo.AntimalwareProcessesErr = common.ServeApiError(common.MapFSErrors(err))
-		logrus.Debugf("epp.ListPPLProcessImagePaths(): %s", err.Error())
+		log.Debug().Msgf("epp.ListPPLProcessImagePaths(): %s", err.Error())
 	}
 
 	return nil

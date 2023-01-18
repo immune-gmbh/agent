@@ -15,7 +15,7 @@ import (
 	"unsafe"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 type osHandleType *int
@@ -35,7 +35,7 @@ func openMEI(path string, clientGUID uuid.UUID) (*meiClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	logrus.Tracef("Connecting MEI client %v\n", clientGUID.String())
+	log.Trace().Msgf("Connecting MEI client %v\n", clientGUID.String())
 	data := littleEndianUUID(clientGUID)
 	if _, _, err := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), IOCTL_CONNECT_CLIENT, uintptr(unsafe.Pointer(&data[0]))); err != 0 {
 		return nil, fmt.Errorf("ioctl IOCTL_CONNECT_CLIENT failed: %w", err)
@@ -48,7 +48,7 @@ func openMEI(path string, clientGUID uuid.UUID) (*meiClient, error) {
 	m.maxMsgLength = binary.LittleEndian.Uint32(data[:4])
 	m.protoVersion = int(uint8(data[4]))
 
-	logrus.Tracef("Opened MEI: %#v", m)
+	log.Trace().Msgf("Opened MEI: %#v", m)
 	return &m, nil
 }
 

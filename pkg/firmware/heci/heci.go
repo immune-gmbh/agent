@@ -7,7 +7,7 @@ import (
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 // ME variant register values
@@ -45,7 +45,7 @@ func reportMEClientCommands(command *api.MEClientCommands) error {
 		buf, err := m.runCommand(v.Command)
 		if err != nil {
 			v.Error = common.ServeApiError(common.MapFSErrors(err))
-			logrus.Tracef("heci.reportMEClientCommands(): cmd #%v %s", i, err.Error())
+			log.Trace().Msgf("heci.reportMEClientCommands(): cmd #%v %s", i, err.Error())
 			continue
 		}
 		v.Response = buf
@@ -55,7 +55,7 @@ func reportMEClientCommands(command *api.MEClientCommands) error {
 }
 
 func ReportMECommands(commands []api.MEClientCommands) (err error) {
-	logrus.Traceln("ReportMECommands()")
+	log.Trace().Msg("ReportMECommands()")
 
 	allFailed := true
 	for i := range commands {
@@ -64,11 +64,11 @@ func ReportMECommands(commands []api.MEClientCommands) (err error) {
 		allFailed = allFailed && err != nil
 		if err != nil {
 			v.Error = common.ServeApiError(common.MapFSErrors(err))
-			logrus.Debugf("heci.ReportMECommands(): %s", err.Error())
+			log.Debug().Msgf("heci.ReportMECommands(): %s", err.Error())
 		}
 	}
 	if allFailed && len(commands) > 0 {
-		logrus.Warnf("Failed to contact Intel ME")
+		log.Warn().Msgf("Failed to contact Intel ME")
 		return
 	}
 

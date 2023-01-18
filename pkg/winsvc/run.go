@@ -11,6 +11,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/util"
+	"github.com/rs/zerolog/log"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/eventlog"
@@ -57,11 +58,11 @@ func (m *agentService) Execute(args []string, r <-chan svc.ChangeRequest, change
 	scheduleInterval := time.Millisecond
 	m.backoff = &Exponential{Min: time.Minute, Max: defaultAttestInterval}
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
-	logrus.Infof("immune Guard agent service %s (%s) started", *m.core.ReleaseId, runtime.GOARCH)
+	log.Info().Msgf("immune Guard agent service %s (%s) started", *m.core.ReleaseId, runtime.GOARCH)
 
 	defer func() {
 		if err := recover(); err != nil {
-			logrus.Errorf("exiting due to panic: %v", err)
+			log.Error().Msgf("exiting due to panic: %v", err)
 		}
 		changes <- svc.Status{State: svc.StopPending}
 	}()
@@ -76,10 +77,10 @@ loop:
 			case svc.Interrogate:
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
-				logrus.Info("stopping")
+				log.Info().Msg("stopping")
 				break loop
 			default:
-				logrus.Errorf("unexpected control request #%d", c)
+				log.Error().Msgf("unexpected control request #%d", c)
 			}
 		}
 	}
@@ -116,21 +117,21 @@ func RunService() int {
 	// bail out if not root
 	root, err := util.IsRoot()
 	if err != nil {
-		logrus.Warn("Can't check user. It is recommended to run as administrator or root user")
-		logrus.Debugf("util.IsRoot(): %s", err.Error())
+		log.Warn().Msg("Can't check user. It is recommended to run as administrator or root user")
+		log.Debug().Msgf("util.IsRoot(): %s", err.Error())
 	} else if !root {
-		logrus.Error("This program must be run with elevated privileges")
+		log.Error().Msg("This program must be run with elevated privileges")
 		return 1
 	}
 
 	// init agent core
 	agentCore := core.NewCore()
-	if err := agentCore.Init(state.DefaultStateDir(), "", nil, logrus.StandardLogger()); err != nil {
+	if err := agentCore.Init(state.DefaultStateDir(), "", nil, &log.Logger); err != nil {
 		return 1
 	}
 
 	if !agentCore.State.IsEnrolled() {
-		logrus.Errorf("No previous state found, please enroll first.")
+		log.Error().Msgf("No previous state found, please enroll first.")
 		return 1
 	}
 
@@ -140,7 +141,7 @@ func RunService() int {
 
 	err = svc.Run(SVC_NAME, &agentService{core: agentCore})
 	if err != nil {
-		logrus.Errorf("%s service failed: %v", SVC_NAME, err)
+		log.Error().Msgf("%s service failed: %v", SVC_NAME, err)
 		return 1
 	}
 

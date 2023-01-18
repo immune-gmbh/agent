@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/go-tpm/tpmutil/tbs"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
@@ -158,12 +158,12 @@ func getAllWBCLLogsFromDisk() ([]byte, error) {
 
 	// see if boot log exists under current dir, otherwise try default dir
 	if _, err := os.Stat(makeWBCLFilePath(wbclPath, uint32(osBootCount), 0)); errors.Is(err, os.ErrNotExist) {
-		logrus.Tracef("srtmlog.getAllWBCLLogsFromDisk(): alternate WBCL path not working: %v", wbclPath)
+		log.Trace().Msgf("srtmlog.getAllWBCLLogsFromDisk(): alternate WBCL path not working: %v", wbclPath)
 		wbclPath, err = getDefaultWBCLPath()
 		if err != nil {
 			return nil, err
 		}
-		logrus.Tracef("srtmlog.getAllWBCLLogsFromDisk(): falling back to default WBCL path: %v", wbclPath)
+		log.Trace().Msgf("srtmlog.getAllWBCLLogsFromDisk(): falling back to default WBCL path: %v", wbclPath)
 	} else if err != nil {
 		return nil, err
 	}
@@ -216,7 +216,7 @@ func readTPM2EventLogWinApi(conn io.ReadWriteCloser) ([]byte, error) {
 			if tbsErr != tbs.ErrInsufficientBuffer {
 				return nil, error(tbsErr)
 			}
-			logrus.Trace("srtmlog.readTPM2EventLogWinApi(): retrying getAllTCGLogs()")
+			log.Trace().Msg("srtmlog.readTPM2EventLogWinApi(): retrying getAllTCGLogs()")
 			continue
 		}
 
@@ -230,7 +230,7 @@ func readTPM2EventLogWinApi(conn io.ReadWriteCloser) ([]byte, error) {
 
 	// fall back to just getting the current event log
 	if tbsErr == tbs.ErrInsufficientBuffer {
-		logrus.Debug("srtmlog.getAllTCGLogs(): failed, falling back to getting only current TCG log")
+		log.Debug().Msg("srtmlog.getAllTCGLogs(): failed, falling back to getting only current TCG log")
 		context, err := tbs.CreateContext(tbs.TPMVersion20, tbs.IncludeTPM20|tbs.IncludeTPM12)
 		if err != nil {
 			return nil, err
@@ -282,12 +282,12 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 	// this is more reliable than getAllTCGLogs() and more complete than GetTCGLog()
 	logs, err := getAllWBCLLogsFromDisk()
 	if err != nil {
-		logrus.Debugf("srtmlog.getAllWBCLLogsFromDisk(): failed to get WBCLs from disk, falling back to API: %v", err)
+		log.Debug().Msgf("srtmlog.getAllWBCLLogsFromDisk(): failed to get WBCLs from disk, falling back to API: %v", err)
 
 		// try to use API functions as fallback
 		logs, err = readTPM2EventLogWinApi(conn)
 		if err != nil {
-			logrus.Debugf("srtmlog.readTPM2EventLogWinApi(): failed to get WBCLs from API, falling back to registry key: %v", err)
+			log.Debug().Msgf("srtmlog.readTPM2EventLogWinApi(): failed to get WBCLs from API, falling back to registry key: %v", err)
 
 			// try getting current WBCL from registry as fallback
 			return readTPM2EventLogRegistry()

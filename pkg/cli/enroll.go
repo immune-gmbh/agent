@@ -8,7 +8,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 type enrollCmd struct {
@@ -51,8 +51,8 @@ func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 	// incorporate dummy TPM state
 	if stub, ok := agentCore.Anchor.(*tcg.SoftwareAnchor); ok {
 		if st, err := stub.Store(); err != nil {
-			logrus.Debugf("SoftwareAnchor.Store: %s", err)
-			logrus.Errorf("Failed to save stub TPM state to disk")
+			log.Debug().Msgf("SoftwareAnchor.Store: %s", err)
+			log.Error().Msgf("Failed to save stub TPM state to disk")
 		} else {
 			agentCore.State.StubState = st
 		}
@@ -60,15 +60,15 @@ func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 
 	// save the new state to disk
 	if err := agentCore.State.Store(agentCore.StatePath); err != nil {
-		logrus.Debugf("Store(%s): %s", agentCore.StatePath, err)
-		logrus.Errorf("Failed to save activated keys to disk")
+		log.Debug().Msgf("Store(%s): %s", agentCore.StatePath, err)
+		log.Error().Msgf("Failed to save activated keys to disk")
 		return err
 	}
 
 	tui.SetUIState(tui.StEnrollSuccess)
-	logrus.Infof("Device enrolled")
+	log.Info().Msgf("Device enrolled")
 	if enroll.NoAttest {
-		logrus.Infof("You can now attest with \"%s attest\"", os.Args[0])
+		log.Info().Msgf("You can now attest with \"%s attest\"", os.Args[0])
 		return nil
 	}
 

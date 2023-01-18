@@ -12,7 +12,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-tpm/tpm2"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
@@ -48,12 +48,12 @@ func fromTPMCurve(cv tpm2.EllipticCurve) (elliptic.Curve, bool) {
 
 // Expects Public and Auth to be set
 func (a *TCGAnchor) CreateAndLoadRoot(endorsementAuth string, rootAuth string, tmpl *api.PublicKey) (Handle, api.PublicKey, error) {
-	log.Traceln("load root key")
+	log.Trace().Msg("load root key")
 	public := *tmpl
 
 	// quick sanity check
 	if public.Attributes&tpm2.FlagDecrypt == 0 {
-		log.Debug("Root key must be a encryption-capable key")
+		log.Debug().Msg("Root key must be a encryption-capable key")
 		return nil, public, fmt.Errorf("invalid template")
 	}
 
@@ -62,7 +62,7 @@ func (a *TCGAnchor) CreateAndLoadRoot(endorsementAuth string, rootAuth string, t
 		a.Conn, tpm2.HandleEndorsement, tpm2.PCRSelection{}, endorsementAuth,
 		rootAuth, tpm2.Public(public))
 	if err != nil {
-		log.Debugf("Failed to create device key: %s", err)
+		log.Debug().Msgf("Failed to create device key: %s", err)
 		return nil, public, err
 	}
 
@@ -87,7 +87,7 @@ func (a *TCGAnchor) CreateAndLoadRoot(endorsementAuth string, rootAuth string, t
 		}
 		public.ECCParameters = &eccParms
 	} else {
-		log.Debug("Root key must be a RSA or ECC key")
+		log.Debug().Msg("Root key must be a RSA or ECC key")
 		return nil, public, fmt.Errorf("invalid template")
 	}
 
@@ -100,7 +100,7 @@ func (a *TCGAnchor) CreateAndCertifyDeviceKey(rootHandle Handle, rootAuth string
 	rootH := rootHandle.(*TCGHandle).Handle
 
 	if template.Public.Attributes&tpm2.FlagSign == 0 {
-		log.Debug("Must be a siging-capable key")
+		log.Debug().Msg("Must be a siging-capable key")
 		return api.Key{}, api.Buffer{}, ErrInvalid
 	}
 
@@ -108,13 +108,13 @@ func (a *TCGAnchor) CreateAndCertifyDeviceKey(rootHandle Handle, rootAuth string
 	privBlob, pubBlob, _, hash, ticket, err := tpm2.CreateKeyWithOutsideInfo(
 		a.Conn, rootH, tpm2.PCRSelection{}, rootAuth, authValue, tpm2.Public(template.Public), []byte(template.Label))
 	if err != nil {
-		log.Debugf("Failed to create device key: %s", err)
+		log.Debug().Msgf("Failed to create device key: %s", err)
 		return api.Key{}, api.Buffer{}, err
 	}
 
 	pub, err := tpm2.DecodePublic(pubBlob)
 	if err != nil {
-		log.Debugf("Failed to decode public area of the newly created key: %s", err)
+		log.Debug().Msgf("Failed to decode public area of the newly created key: %s", err)
 		return api.Key{}, api.Buffer{}, err
 	}
 
@@ -133,14 +133,14 @@ func (a *TCGAnchor) CreateAndCertifyDeviceKey(rootHandle Handle, rootAuth string
 			scheme = defaultECCSigningScheme
 		}
 	} else {
-		log.Debugf("Unknown key type %v. Needs to be ECC or RSA", pub.Type)
+		log.Debug().Msgf("Unknown key type %v. Needs to be ECC or RSA", pub.Type)
 		return api.Key{}, api.Buffer{}, ErrInvalid
 	}
 
 	// load the key into the TPM
 	handle, _, err := tpm2.Load(a.Conn, rootH, rootAuth, pubBlob, privBlob)
 	if err != nil {
-		log.Debugf("Failed to load key after creation: %s", err)
+		log.Debug().Msgf("Failed to load key after creation: %s", err)
 		return api.Key{}, api.Buffer{}, err
 	}
 
@@ -148,19 +148,19 @@ func (a *TCGAnchor) CreateAndCertifyDeviceKey(rootHandle Handle, rootAuth string
 	attestBlob, sigData, err := tpm2.CertifyCreation(a.Conn, authValue, handle, handle, []byte{}, hash, scheme, ticket)
 	tpm2.FlushContext(a.Conn, handle)
 	if err != nil {
-		log.Debugf("Failed to attest key creation: %s", err)
+		log.Debug().Msgf("Failed to attest key creation: %s", err)
 		return api.Key{}, api.Buffer{}, err
 	}
 
 	// decode attestation structure
 	attestRef, err := tpm2.DecodeAttestationData(attestBlob)
 	if err != nil {
-		log.Debugf("Failed to decode newly created attestation data: %s", err)
+		log.Debug().Msgf("Failed to decode newly created attestation data: %s", err)
 		return api.Key{}, api.Buffer{}, err
 	}
 	sigRef, err := tpm2.DecodeSignature(bytes.NewBuffer(sigData))
 	if err != nil {
-		log.Debugf("Failed to decode newly created attestation signature: %s", err)
+		log.Debug().Msgf("Failed to decode newly created attestation signature: %s", err)
 		return api.Key{}, api.Buffer{}, err
 	}
 
@@ -174,7 +174,7 @@ func (a *TCGAnchor) CreateAndCertifyDeviceKey(rootHandle Handle, rootAuth string
 }
 
 func (a *TCGAnchor) LoadDeviceKey(rootHandle Handle, rootAuth string, public api.PublicKey, private api.Buffer) (Handle, error) {
-	log.Traceln("loading device key")
+	log.Trace().Msg("loading device key")
 	rootH := rootHandle.(*TCGHandle).Handle
 
 	blob, err := tpm2.Public(public).Encode()
@@ -185,7 +185,7 @@ func (a *TCGAnchor) LoadDeviceKey(rootHandle Handle, rootAuth string, public api
 	// load the key into the TPM
 	handle, _, err := tpm2.Load(a.Conn, rootH, rootAuth, blob, private)
 	if err != nil {
-		log.Debugf("Failed to load key: %s", err)
+		log.Debug().Msgf("Failed to load key: %s", err)
 	}
 
 	return &TCGHandle{Handle: handle}, err

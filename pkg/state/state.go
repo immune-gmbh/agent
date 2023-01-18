@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 )
@@ -70,7 +70,7 @@ func (s *State) EnsureFresh(cl *api.Client) (bool, error) {
 
 // LoadState returns a loaded state and a bool if it has been updated or error
 func LoadState(keysPath string) (*State, bool, error) {
-	logrus.Traceln("load on-disk state")
+	log.Trace().Msg("load on-disk state")
 	if _, err := os.Stat(keysPath); os.IsNotExist(err) {
 		return nil, false, ErrNotExist
 	} else if os.IsPermission(err) {
@@ -107,7 +107,7 @@ func migrateState(raw []byte) (*State, bool, error) {
 	var dict map[string]interface{}
 
 	if err := json.Unmarshal(raw, &dict); err != nil {
-		logrus.Debugf("State file is not a JSON dict: %s", err)
+		log.Debug().Msgf("State file is not a JSON dict: %s", err)
 		return nil, false, ErrInvalid
 	}
 
@@ -115,7 +115,7 @@ func migrateState(raw []byte) (*State, bool, error) {
 		if str, ok := val.(string); ok {
 			switch str {
 			case ClientStateTypeV2:
-				logrus.Debugf("Migrating state from v2 to v3")
+				log.Debug().Msgf("Migrating state from v2 to v3")
 				if st3, err := migrateStateV2(raw); err != nil {
 					return nil, false, err
 				} else {
@@ -129,14 +129,14 @@ func migrateState(raw []byte) (*State, bool, error) {
 				update := selectTPM(&st)
 				return &st, update, err
 			default:
-				logrus.Debugf("Unknown state type '%s'", str)
+				log.Debug().Msgf("Unknown state type '%s'", str)
 				return nil, false, ErrInvalid
 			}
 		} else {
-			logrus.Debugf("State file type is not a string")
+			log.Debug().Msgf("State file type is not a string")
 		}
 	} else {
-		logrus.Debugf("State file has no type")
+		log.Debug().Msgf("State file has no type")
 	}
 
 	return nil, false, ErrInvalid

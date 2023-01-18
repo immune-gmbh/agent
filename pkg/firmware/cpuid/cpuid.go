@@ -3,7 +3,7 @@ package cpuid
 import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/util"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 type CPUVendor uint
@@ -20,7 +20,7 @@ var vendorMap = map[string]CPUVendor{
 }
 
 func ReportCPUIDLeaf(leaf *api.CPUIDLeaf) {
-	logrus.Traceln("ReportCPUIDLeaf()")
+	log.Trace().Msg("ReportCPUIDLeaf()")
 
 	eax, ebx, ecx, edx := readCPUID(leaf.LeafEAX, leaf.LeafECX)
 

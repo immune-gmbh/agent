@@ -8,7 +8,8 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
@@ -24,15 +25,15 @@ const (
 type verboseFlag bool
 
 func (v verboseFlag) BeforeApply() error {
-	logrus.SetLevel(logrus.DebugLevel)
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	return nil
 }
 
 type traceFlag bool
 
 func (v traceFlag) BeforeApply() error {
-	logrus.SetLevel(logrus.TraceLevel)
-	logrus.SetReportCaller(true)
+	zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	log.Logger = log.Logger.With().Caller().Logger()
 	return nil
 }
 
@@ -58,19 +59,30 @@ func initUI(forceColors bool, forceLog bool) {
 	// honor NO_COLOR env var as per https://no-color.org/ like the colors library we use does, too
 	_, noColors := os.LookupEnv("NO_COLOR")
 
+	cw := zerolog.ConsoleWriter{
+		Out:        colorable.NewColorableStdout(),
+		NoColor:    false,
+		TimeFormat: "15:04:05"}
+
+	// handle different console environments
+	// if tui is disabled, then the log is our ui; so we use stdout
 	if forceColors || (!notty && !noColors) {
-		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
-		logrus.SetOutput(colorable.NewColorableStdout())
+		cw.NoColor = false
+		cw.Out = colorable.NewColorableStdout()
 	} else {
-		logrus.SetFormatter(&logrus.TextFormatter{DisableColors: noColors && !forceColors})
-		logrus.SetOutput(os.Stdout)
+		cw.NoColor = noColors && !forceColors
+		cw.Out = os.Stdout
 	}
 
+	// use tui instead of log as ui
 	if !forceLog && !notty {
 		tui.Init()
-		logrus.SetLevel(logrus.ErrorLevel)
-		logrus.SetOutput(tui.Err)
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+		cw.Out = tui.Err
 	}
+
+	// apply settings to global default logger
+	log.Logger = log.Output(cw)
 }
 
 func RunCommandLineTool() int {
@@ -103,21 +115,21 @@ func RunCommandLineTool() int {
 	initUI(cli.Colors, cli.LogFlag || bool(cli.Verbose) || bool(cli.Trace))
 
 	// tell who we are
-	logrus.Debug(desc)
+	log.Debug().Msg(desc)
 
 	// bail out if not root
 	root, err := util.IsRoot()
 	if err != nil {
-		logrus.Warn("Can't check user. It is recommended to run as administrator or root user")
-		logrus.Debugf("util.IsRoot(): %s", err.Error())
+		log.Warn().Msg("Can't check user. It is recommended to run as administrator or root user")
+		log.Debug().Msgf("util.IsRoot(): %s", err.Error())
 	} else if !root {
 		tui.SetUIState(tui.StNoRoot)
-		logrus.Error("This program must be run with elevated privileges")
+		log.Error().Msg("This program must be run with elevated privileges")
 		return 1
 	}
 
 	// init agent core
-	if err := agentCore.Init(cli.StateDir, cli.CA, cli.Server, logrus.StandardLogger()); err != nil {
+	if err := agentCore.Init(cli.StateDir, cli.CA, cli.Server, &log.Logger); err != nil {
 		tui.DumpErr()
 		return 1
 	}

@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	tpm1 "github.com/google/go-tpm/tpm"
 	"github.com/google/go-tpm/tpm2"
@@ -58,7 +58,7 @@ func (a *TCGAnchor) Close() {
 }
 
 func (a *TCGAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffer, banks []tpm2.Algorithm, pcrs []int) (api.Attest, api.Signature, error) {
-	logrus.Traceln("tpm quote")
+	log.Trace().Msg("tpm quote")
 
 	aikH := aikHandle.(*TCGHandle).Handle
 
@@ -74,8 +74,8 @@ func (a *TCGAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffe
 	// generate quote
 	attestBuf, sig, err := tpm2.Quote(a.Conn, aikH, aikAuth, "" /*unused*/, []byte(additional), pcrSel, tpm2.AlgNull)
 	if err != nil {
-		logrus.Debugf("TPM2_Quote failed: %s", err)
-		logrus.Error("TPM 2.0 attestation failed")
+		log.Debug().Msgf("TPM2_Quote failed: %s", err)
+		log.Error().Msg("TPM 2.0 attestation failed")
 		return api.Attest{}, api.Signature{}, err
 	}
 	aikHandle.Flush(a)
@@ -83,8 +83,8 @@ func (a *TCGAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffe
 	// fill evidence struct
 	attest, err := tpm2.DecodeAttestationData(attestBuf)
 	if err != nil {
-		logrus.Debugf("TPM2_Quote did not return a valid TPM2B_ATTEST: %s", err)
-		logrus.Error("Failed to decode TPM response")
+		log.Debug().Msgf("TPM2_Quote did not return a valid TPM2B_ATTEST: %s", err)
+		log.Error().Msg("Failed to decode TPM response")
 		return api.Attest{}, api.Signature{}, err
 	}
 
@@ -92,7 +92,7 @@ func (a *TCGAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffe
 }
 
 func (a *TCGAnchor) PCRValues(bank tpm2.Algorithm, pcrsel []int) (map[string]api.Buffer, error) {
-	logrus.Traceln("read PCRs")
+	log.Trace().Msg("read PCRs")
 
 	// get available PCR banks and convert it to a map of PCRs per hash
 	tmp, err := CapabilityPCRs(a.Conn)
@@ -135,7 +135,7 @@ func (a *TCGAnchor) PCRValues(bank tpm2.Algorithm, pcrsel []int) (map[string]api
 }
 
 func (a *TCGAnchor) AllPCRValues() (map[string]map[string]api.Buffer, error) {
-	logrus.Traceln("read all PCRs")
+	log.Trace().Msg("read all PCRs")
 
 	availablePCRs, err := CapabilityPCRs(a.Conn)
 	if err != nil {
@@ -287,7 +287,7 @@ func FlushTransientHandles(conn io.ReadWriteCloser) error {
 	}
 
 	if len(vals) > 0 {
-		logrus.Debugf("Flushing %d transient objects off the TPM\n", len(vals))
+		log.Debug().Msgf("Flushing %d transient objects off the TPM\n", len(vals))
 
 		for _, handle := range vals {
 			switch t := handle.(type) {
@@ -306,7 +306,7 @@ func stubTPM(stubState *state.StubState) (anchor TrustAnchor, err error) {
 	if stubState != nil {
 		anchor, err = LoadSoftwareAnchor(stubState)
 		if err != nil {
-			logrus.Debugf("Cannot load previous Stub TPM state: %s", err)
+			log.Debug().Msgf("Cannot load previous Stub TPM state: %s", err)
 			stubState = nil
 		}
 	}
@@ -314,7 +314,7 @@ func stubTPM(stubState *state.StubState) (anchor TrustAnchor, err error) {
 	if anchor == nil {
 		anchor, err = NewSoftwareAnchor()
 		if err != nil {
-			logrus.Debugf("Cannot initalize new Stub TPM: %s", err)
+			log.Debug().Msgf("Cannot initalize new Stub TPM: %s", err)
 		}
 	}
 	return
@@ -326,7 +326,7 @@ func assertNotTPM1(conn io.ReadWriteCloser) error {
 	if err != nil {
 		_, err := tpm1.GetCapVersionVal(conn)
 		if err != nil {
-			logrus.Error("Unsupported TPM version 1.2. Please contact us via sales@immu.ne.")
+			log.Error().Msg("Unsupported TPM version 1.2. Please contact us via sales@immu.ne.")
 			return errors.New("TPM1.2 is not supported")
 		}
 	}

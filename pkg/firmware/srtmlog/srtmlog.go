@@ -7,20 +7,20 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 	"github.com/klauspost/compress/zstd"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 var ErrNoEventLog = common.ErrorNoResponse(errors.New("no event log found"))
 
-func ReportTPM2EventLog(log *api.ErrorBuffer, conn io.ReadWriteCloser) error {
-	logrus.Traceln("ReportTPM2EventLog()")
+func ReportTPM2EventLog(eventlog *api.ErrorBuffer, conn io.ReadWriteCloser) error {
+	log.Trace().Msg("ReportTPM2EventLog()")
 
 	buf, err := readTPM2EventLog(conn)
 	if err != nil {
-		logrus.Debugf("srtmlog.ReportTPM2EventLog(): %s", err.Error())
-		logrus.Warnf("Failed to read TPM 2.0 event log")
+		log.Debug().Msgf("srtmlog.ReportTPM2EventLog(): %s", err.Error())
+		log.Warn().Msgf("Failed to read TPM 2.0 event log")
 		//XXX map tpmutil errors
-		log.Error = common.ServeApiError(mapErrors(common.MapFSErrors(err)))
+		eventlog.Error = common.ServeApiError(mapErrors(common.MapFSErrors(err)))
 		return err
 	}
 
@@ -29,7 +29,7 @@ func ReportTPM2EventLog(log *api.ErrorBuffer, conn io.ReadWriteCloser) error {
 		if err != nil {
 			return err
 		}
-		log.Data = encoder.EncodeAll(buf, make([]byte, 0, len(buf)))
+		eventlog.Data = encoder.EncodeAll(buf, make([]byte, 0, len(buf)))
 	}
 
 	return nil
@@ -39,8 +39,8 @@ func ReportPCPQuoteKeys() (map[string]api.Buffer, error) {
 	quoteKeys := make(map[string]api.Buffer)
 	names, blobs, err := PCPQuoteKeys()
 	if err != nil {
-		logrus.Debugf("srtmlog.PCPQuoteKeys(): %s", err.Error())
-		logrus.Warnf("Failed to read PCP quote keys")
+		log.Debug().Msgf("srtmlog.PCPQuoteKeys(): %s", err.Error())
+		log.Warn().Msgf("Failed to read PCP quote keys")
 	} else if len(names) == len(blobs) && len(names) > 0 {
 		for i, name := range names {
 			quoteKeys[name] = blobs[i]

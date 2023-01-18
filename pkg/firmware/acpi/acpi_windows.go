@@ -6,7 +6,7 @@ import (
 	"unsafe"
 
 	"github.com/immune-gmbh/agent/v3/pkg/util"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -105,7 +105,7 @@ func readACPITables() (map[string][]byte, error) {
 	for _, id := range tableIDs {
 		table, err := readACPITable(id)
 		if err != nil {
-			log.Warnf("error getting acpi table '%v': %s", table, err.Error())
+			log.Warn().Msgf("error getting acpi table '%v': %s", table, err.Error())
 			continue
 		}
 		completeFailure = false

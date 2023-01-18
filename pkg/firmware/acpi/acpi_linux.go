@@ -6,7 +6,7 @@ import (
 	"path"
 
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -29,7 +29,7 @@ func readACPITables() (map[string][]byte, error) {
 		path := path.Join(sysfsDir, f.Name())
 		buf, err := readACPITableFile(path)
 		if err != nil {
-			log.Debugf("error getting acpi table '%s': %s", f.Name(), err.Error())
+			log.Debug().Msgf("error getting acpi table '%s': %s", f.Name(), err.Error())
 			continue
 		}
 		completeFailure = false

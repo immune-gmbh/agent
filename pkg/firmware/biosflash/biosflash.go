@@ -4,17 +4,17 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 	"github.com/klauspost/compress/zstd"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 func ReportBiosFlash(flash *api.ErrorBuffer) error {
-	logrus.Traceln("ReportBiosFlash()")
+	log.Trace().Msg("ReportBiosFlash()")
 
 	buf, err := readBiosFlashMMap()
 	if err != nil {
 		flash.Error = common.ServeApiError(common.MapFSErrors(err))
-		logrus.Debugf("biosflash.ReportBiosFlash(): %s", err.Error())
-		logrus.Warnf("Failed to read UEFI/BIOS flash")
+		log.Debug().Msgf("biosflash.ReportBiosFlash(): %s", err.Error())
+		log.Warn().Msgf("Failed to read UEFI/BIOS flash")
 		return err
 	}
 	encoder, err := zstd.NewWriter(nil)

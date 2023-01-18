@@ -6,7 +6,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 type AttestationClient struct {
@@ -26,5 +26,5 @@ type AttestationClient struct {
 	EndorsementAuth string
 
 	// Logging
-	Log *logrus.Logger
+	Log *zerolog.Logger
 }

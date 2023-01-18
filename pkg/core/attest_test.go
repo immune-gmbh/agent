@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
@@ -60,7 +60,7 @@ func (testAnchor) Close() {
 func TestToQuoteList(t *testing.T) {
 	ctx := context.Background()
 	agentCore := NewCore()
-	agentCore.Log = logrus.StandardLogger()
+	agentCore.Log = &log.Logger
 
 	// sha1 only
 	agentCore.Anchor = testAnchor{
