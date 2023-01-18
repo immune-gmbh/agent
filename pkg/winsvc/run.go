@@ -98,6 +98,7 @@ func (m *agentService) runAttest() time.Duration {
 	// run attest and retry with exponential backoff in case of error
 	_, _, err := m.core.Attest(ctx, "", false)
 	if err != nil {
+		// XXX need to log user visible errors here; core only logs belor error
 		return m.backoff.Increase()
 	}
 	m.backoff.Reset()
@@ -118,7 +119,7 @@ func RunService() int {
 	root, err := util.IsRoot()
 	if err != nil {
 		log.Warn().Msg("Can't check user. It is recommended to run as administrator or root user")
-		log.Debug().Msgf("util.IsRoot(): %s", err.Error())
+		log.Debug().Err(err).Msg("util.IsRoot()")
 	} else if !root {
 		log.Error().Msg("This program must be run with elevated privileges")
 		return 1
@@ -127,15 +128,17 @@ func RunService() int {
 	// init agent core
 	agentCore := core.NewCore()
 	if err := agentCore.Init(state.DefaultStateDir(), "", nil, &log.Logger); err != nil {
+		// XXX need to log user visible errors here; core only logs belor error
 		return 1
 	}
 
 	if !agentCore.State.IsEnrolled() {
-		log.Error().Msgf("No previous state found, please enroll first.")
+		log.Error().Msg("No previous state found, please enroll first.")
 		return 1
 	}
 
 	if err := agentCore.OpenTPM(); err != nil {
+		log.Error().Msgf("Cannot open TPM: %s", agentCore.State.TPM)
 		return 1
 	}
 

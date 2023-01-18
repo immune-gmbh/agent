@@ -49,18 +49,18 @@ func ReportMSRs(MSRs []api.MSR) error {
 		err = reportMSR(v)
 		completeFailure = completeFailure && err != nil
 		if err != nil {
-			log.Debug().Msgf("[MSR] %v", err.Error())
+			log.Debug().Err(err).Msg("msr")
 			v.Error = common.ServeApiError(common.MapFSErrors(err))
 		}
 	}
 	if completeFailure && len(MSRs) > 0 {
-		log.Warn().Msgf("Failed to access model specific registers")
+		log.Warn().Msg("Failed to access model specific registers")
 		if runtime.GOOS == "linux" {
 			loaded, err := util.IsKernelModuleLoaded("msr")
 			if err != nil {
 				log.Warn().Msgf("error checking if msr kernel module is loaded: %v", err.Error())
 			} else if !loaded {
-				log.Warn().Msgf("msr kernel module is not loaded")
+				log.Warn().Msg("msr kernel module is not loaded")
 			}
 		}
 		return err

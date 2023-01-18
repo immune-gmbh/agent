@@ -13,8 +13,8 @@ func ReportIMALog(imaLog *api.ErrorBuffer) error {
 
 	buf, err := readIMALog()
 	if err != nil {
-		log.Debug().Msgf("ima.ReportIMALog(): %s", err.Error())
-		log.Warn().Msgf("Failed to read Linux IMA runtime measurement log")
+		log.Debug().Err(err).Msg("ima.ReportIMALog()")
+		log.Warn().Msg("Failed to read Linux IMA runtime measurement log")
 		imaLog.Error = common.ServeApiError(common.MapFSErrors(err))
 		return err
 	}

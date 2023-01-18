@@ -74,7 +74,7 @@ func (a *TCGAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffe
 	// generate quote
 	attestBuf, sig, err := tpm2.Quote(a.Conn, aikH, aikAuth, "" /*unused*/, []byte(additional), pcrSel, tpm2.AlgNull)
 	if err != nil {
-		log.Debug().Msgf("TPM2_Quote failed: %s", err)
+		log.Debug().Err(err).Msg("TPM2_Quote failed")
 		log.Error().Msg("TPM 2.0 attestation failed")
 		return api.Attest{}, api.Signature{}, err
 	}
@@ -83,7 +83,7 @@ func (a *TCGAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffe
 	// fill evidence struct
 	attest, err := tpm2.DecodeAttestationData(attestBuf)
 	if err != nil {
-		log.Debug().Msgf("TPM2_Quote did not return a valid TPM2B_ATTEST: %s", err)
+		log.Debug().Err(err).Msg("TPM2_Quote did not return a valid TPM2B_ATTEST")
 		log.Error().Msg("Failed to decode TPM response")
 		return api.Attest{}, api.Signature{}, err
 	}
@@ -306,7 +306,7 @@ func stubTPM(stubState *state.StubState) (anchor TrustAnchor, err error) {
 	if stubState != nil {
 		anchor, err = LoadSoftwareAnchor(stubState)
 		if err != nil {
-			log.Debug().Msgf("Cannot load previous Stub TPM state: %s", err)
+			log.Debug().Err(err).Msg("cannot load previous Stub TPM state")
 			stubState = nil
 		}
 	}
@@ -314,7 +314,7 @@ func stubTPM(stubState *state.StubState) (anchor TrustAnchor, err error) {
 	if anchor == nil {
 		anchor, err = NewSoftwareAnchor()
 		if err != nil {
-			log.Debug().Msgf("Cannot initalize new Stub TPM: %s", err)
+			log.Debug().Err(err).Msg("cannot initalize new Stub TPM")
 		}
 	}
 	return

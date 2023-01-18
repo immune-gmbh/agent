@@ -9,7 +9,7 @@ import (
 func reportSEVCommand(cmd *api.SEVCommand) error {
 	val, err := runSEVCommand(cmd.Command, cmd.ReadLength)
 	if err != nil {
-		log.Debug().Msgf("sev.ReportSEVCommand(): %s", err.Error())
+		log.Debug().Err(err).Msg("sev.ReportSEVCommand()")
 		cmd.Error = common.ServeApiError(common.MapFSErrors(err))
 		return err
 	}
@@ -29,7 +29,7 @@ func ReportSEVCommands(cmds []api.SEVCommand) (err error) {
 		allFailed = allFailed && err != nil
 	}
 	if allFailed && len(cmds) > 0 {
-		log.Warn().Msgf("Failed to access AMD SecureProcessor")
+		log.Warn().Msg("Failed to access AMD SecureProcessor")
 		return
 	}
 

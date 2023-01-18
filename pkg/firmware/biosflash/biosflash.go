@@ -13,8 +13,8 @@ func ReportBiosFlash(flash *api.ErrorBuffer) error {
 	buf, err := readBiosFlashMMap()
 	if err != nil {
 		flash.Error = common.ServeApiError(common.MapFSErrors(err))
-		log.Debug().Msgf("biosflash.ReportBiosFlash(): %s", err.Error())
-		log.Warn().Msgf("Failed to read UEFI/BIOS flash")
+		log.Debug().Err(err).Msg("biosflash.ReportBiosFlash()")
+		log.Warn().Msg("Failed to read UEFI/BIOS flash")
 		return err
 	}
 	encoder, err := zstd.NewWriter(nil)

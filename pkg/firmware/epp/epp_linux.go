@@ -21,19 +21,19 @@ func ReportEPP(eppInfo *api.EPPInfo) error {
 	data, err := os.ReadFile("/sys/module/eset_rtp/settings/enable")
 	eset.Enabled.Data = api.Buffer(data)
 	if err != nil {
-		log.Debug().Msgf("Reading settings/enable: %s", err.Error())
+		log.Debug().Err(err).Msg("reading settings/enable")
 		eset.Enabled.Error = common.ServeApiError(common.MapFSErrors(err))
 	}
 	data, err = os.ReadFile("/sys/module/eset_rtp/settings/excludes/files")
 	eset.ExcludedFiles.Data = api.Buffer(data)
 	if err != nil {
-		log.Debug().Msgf("Reading settings/excludes/files: %s", err.Error())
+		log.Debug().Err(err).Msg("reading settings/excludes/files")
 		eset.ExcludedFiles.Error = common.ServeApiError(common.MapFSErrors(err))
 	}
 	data, err = os.ReadFile("/sys/module/eset_rtp/settings/excludes/procs")
 	eset.ExcludedProcesses.Data = api.Buffer(data)
 	if err != nil {
-		log.Debug().Msgf("Reading settings/excludes/procs: %s", err.Error())
+		log.Debug().Err(err).Msg("reading settings/excludes/procs")
 		eset.ExcludedProcesses.Error = common.ServeApiError(common.MapFSErrors(err))
 	}
 

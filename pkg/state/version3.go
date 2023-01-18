@@ -62,7 +62,7 @@ func migrateStateV2(raw []byte) (*StateV3, error) {
 	var st2 StateV2
 
 	if err := json.Unmarshal(raw, &st2); err != nil {
-		log.Debug().Msgf("State file corrupted: %s", err)
+		log.Debug().Err(err).Msg("state file corrupted")
 		return nil, ErrInvalid
 	}
 

@@ -18,7 +18,7 @@ func ReportEPP(eppInfo *api.EPPInfo) error {
 		}
 	} else {
 		eppInfo.EarlyLaunchDriversErr = common.ServeApiError(common.MapFSErrors(err))
-		log.Debug().Msgf("epp.ListElamDriverPaths(): %s", err.Error())
+		log.Debug().Err(err).Msg("epp.ListElamDriverPaths()")
 	}
 
 	pplImages, err := ListPPLProcessImagePaths()
@@ -29,7 +29,7 @@ func ReportEPP(eppInfo *api.EPPInfo) error {
 		}
 	} else {
 		eppInfo.AntimalwareProcessesErr = common.ServeApiError(common.MapFSErrors(err))
-		log.Debug().Msgf("epp.ListPPLProcessImagePaths(): %s", err.Error())
+		log.Debug().Err(err).Msg("epp.ListPPLProcessImagePaths()")
 	}
 
 	return nil

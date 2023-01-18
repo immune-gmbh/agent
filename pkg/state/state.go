@@ -107,7 +107,7 @@ func migrateState(raw []byte) (*State, bool, error) {
 	var dict map[string]interface{}
 
 	if err := json.Unmarshal(raw, &dict); err != nil {
-		log.Debug().Msgf("State file is not a JSON dict: %s", err)
+		log.Debug().Err(err).Msg("state file is not a JSON dict")
 		return nil, false, ErrInvalid
 	}
 
@@ -115,7 +115,7 @@ func migrateState(raw []byte) (*State, bool, error) {
 		if str, ok := val.(string); ok {
 			switch str {
 			case ClientStateTypeV2:
-				log.Debug().Msgf("Migrating state from v2 to v3")
+				log.Debug().Msg("Migrating state from v2 to v3")
 				if st3, err := migrateStateV2(raw); err != nil {
 					return nil, false, err
 				} else {
@@ -133,10 +133,10 @@ func migrateState(raw []byte) (*State, bool, error) {
 				return nil, false, ErrInvalid
 			}
 		} else {
-			log.Debug().Msgf("State file type is not a string")
+			log.Debug().Msg("State file type is not a string")
 		}
 	} else {
-		log.Debug().Msgf("State file has no type")
+		log.Debug().Msg("State file has no type")
 	}
 
 	return nil, false, ErrInvalid

@@ -10,7 +10,7 @@ func reportConfigSpace(request *api.PCIConfigSpace) error {
 	buf, err := readConfigSpace(uint32(request.Bus), uint32(request.Device), uint32(request.Function), 0, 4096)
 
 	if err != nil {
-		log.Debug().Msgf("pci.ReportConfigSpace(): %s", err.Error())
+		log.Debug().Err(err).Msg("pci.ReportConfigSpace()")
 		request.Error = common.ServeApiError(common.MapFSErrors(err))
 		return err
 	}
@@ -28,7 +28,7 @@ func ReportConfigSpaces(requests []api.PCIConfigSpace) (err error) {
 		allFailed = allFailed && err != nil
 	}
 	if allFailed && len(requests) > 0 {
-		log.Warn().Msgf("Failed to read PCI configuration space")
+		log.Warn().Msg("Failed to read PCI configuration space")
 		return
 	}
 	err = nil

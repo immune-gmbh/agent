@@ -23,8 +23,8 @@ const (
 func ReportFWUPD(devs *api.Devices) error {
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
-		log.Debug().Msgf("fwupd.ReportFWUPD(): %s", err.Error())
-		log.Warn().Msgf("Failed to connect to FWUPD via DBUS")
+		log.Debug().Err(err).Msg("fwupd.ReportFWUPD()")
+		log.Warn().Msg("Failed to connect to FWUPD via DBUS")
 		return err
 	}
 	defer conn.Close()
@@ -32,8 +32,8 @@ func ReportFWUPD(devs *api.Devices) error {
 	obj := conn.Object("org.freedesktop.fwupd", "/")
 	v, err := obj.GetProperty("org.freedesktop.fwupd.DaemonVersion")
 	if err != nil {
-		log.Debug().Msgf("fwupd.ReportFWUPD(): %s", err.Error())
-		log.Warn().Msgf("Failed to get FWUPD version info")
+		log.Debug().Err(err).Msg("fwupd.ReportFWUPD()")
+		log.Warn().Msg("Failed to get FWUPD version info")
 		return err
 	}
 	devs.FWUPdVersion = v.String()
@@ -48,16 +48,16 @@ func ReportFWUPD(devs *api.Devices) error {
 			FWUPD_FEATURE_FLAG_COMMUNITY_TEXT|
 			FWUPD_FEATURE_FLAG_SHOW_PROBLEMS).Err
 	if err != nil {
-		log.Debug().Msgf("fwupd.ReportFWUPD(): %s", err.Error())
-		log.Warn().Msgf("Failed to set FWUPD feature flags")
+		log.Debug().Err(err).Msg("fwupd.ReportFWUPD()")
+		log.Warn().Msg("Failed to set FWUPD feature flags")
 		return err
 	}
 
 	var devices []map[string]dbus.Variant
 	err = obj.Call("org.freedesktop.fwupd.GetDevices", 0).Store(&devices)
 	if err != nil {
-		log.Debug().Msgf("fwupd.ReportFWUPD(): %s", err.Error())
-		log.Warn().Msgf("Failed to get FWUPD devices")
+		log.Debug().Err(err).Msg("fwupd.ReportFWUPD()")
+		log.Warn().Msg("Failed to get FWUPD devices")
 		return err
 	}
 
@@ -81,7 +81,7 @@ func ReportFWUPD(devs *api.Devices) error {
 		// there are errors for devices that have no releases, no version set etc and for
 		// now we just ignore them and treat all errors as "no releases", which might be to inaccurate in the future
 		if err != nil {
-			log.Debug().Msgf("fwupd.ReportFWUPD(): GetReleases %s %s", val, err.Error())
+			log.Debug().Err(err).Msgf("fwupd.ReportFWUPD(): GetReleases %s", val)
 		} else {
 			devs.Releases[val] = make([]api.FWUPdReleaseInfo, len(releases))
 			for i, release := range releases {

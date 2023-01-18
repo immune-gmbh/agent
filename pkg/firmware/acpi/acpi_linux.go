@@ -29,7 +29,7 @@ func readACPITables() (map[string][]byte, error) {
 		path := path.Join(sysfsDir, f.Name())
 		buf, err := readACPITableFile(path)
 		if err != nil {
-			log.Debug().Msgf("error getting acpi table '%s': %s", f.Name(), err.Error())
+			log.Debug().Err(err).Msgf("getting acpi table: %s", f.Name())
 			continue
 		}
 		completeFailure = false

@@ -48,7 +48,7 @@ func CreateService() error {
 func RemoveService() error {
 	err := util.DeleteDriverService(DriverServiceName)
 	if err != nil {
-		log.Debug().Msgf("failed removing immuneCPU: %s", err)
+		log.Debug().Err(err).Msg("failed removing immuneCPU")
 	}
 	return err
 }
@@ -56,7 +56,7 @@ func RemoveService() error {
 func StopDriver() error {
 	err := util.StopDriver(DriverServiceName)
 	if err != nil {
-		log.Debug().Msgf("failed stopping immuneCPU: %s", err)
+		log.Debug().Err(err).Msg("failed stopping immuneCPU")
 	}
 	return err
 }

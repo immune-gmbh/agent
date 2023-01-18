@@ -12,8 +12,8 @@ func ReportSMBIOS(table *api.ErrorBuffer) error {
 	buf, err := readSMBIOS()
 	if err != nil {
 		table.Error = common.ServeApiError(common.MapFSErrors(err))
-		log.Debug().Msgf("smbios.ReportSMBIOS(): %s", err.Error())
-		log.Warn().Msgf("Failed to get SMBIOS tables")
+		log.Debug().Err(err).Msg("smbios.ReportSMBIOS()")
+		log.Warn().Msg("Failed to get SMBIOS tables")
 		return err
 	}
 	table.Data = buf
