@@ -34,7 +34,7 @@ import (
 // GatherFirmwareData passes the server-sent configuration leafs to the appropriate report sub-functions.
 // Error handling and logging is mostly left to the leaf functions. If part of the report fails, it is
 // simply omitted. Errors that are meaningful for the SaaS are stored in the error members of the api structs.
-func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) (api.FirmwareProperties, error) {
+func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) api.FirmwareProperties {
 	log.Trace().Msg("start gathering firmware data")
 
 	var fwData api.FirmwareProperties
@@ -166,7 +166,7 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	}
 
 	log.Trace().Msg("done gathering report data")
-	return fwData, nil
+	return fwData
 }
 
 func ReportTPM2Properties(properties []api.TPM2Property, tpmConn io.ReadWriteCloser) (err error) {

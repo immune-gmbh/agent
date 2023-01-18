@@ -25,10 +25,7 @@ func doCollect(ctx context.Context, cfg *api.Configuration) error {
 	// collect firmware info
 	tui.SetUIState(tui.StCollectFirmwareInfo)
 	log.Info().Msg("Collecting firmware info")
-	fwProps, err := firmware.GatherFirmwareData(conn, cfg)
-	if err != nil {
-		return err
-	}
+	fwProps := firmware.GatherFirmwareData(conn, cfg)
 
 	// fetch the runtime measurment log
 	fwProps.IMALog = new(api.ErrorBuffer)
