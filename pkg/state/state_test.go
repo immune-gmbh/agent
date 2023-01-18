@@ -10,7 +10,7 @@ import (
 	"testing/quick"
 
 	"github.com/immune-gmbh/guard/pkg/tpm"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	test "github.com/immune-gmbh/agent/internal/testing"
 )

@@ -13,7 +13,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/firmware"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/ima"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 type collectCmd struct {
@@ -24,7 +24,7 @@ func doCollect(ctx context.Context, cfg *api.Configuration) error {
 
 	// collect firmware info
 	tui.SetUIState(tui.StCollectFirmwareInfo)
-	logrus.Info("Collecting firmware info")
+	log.Info().Msg("Collecting firmware info")
 	fwProps, err := firmware.GatherFirmwareData(conn, cfg)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func doCollect(ctx context.Context, cfg *api.Configuration) error {
 	if err := os.WriteFile(path, evidenceJSON, 0644); err != nil {
 		return err
 	}
-	logrus.Infof("Dumped evidence json: %s", path)
+	log.Info().Msgf("Dumped evidence json: %s", path)
 
 	return nil
 }

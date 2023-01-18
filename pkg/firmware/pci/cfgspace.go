@@ -3,14 +3,14 @@ package pci
 import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 func reportConfigSpace(request *api.PCIConfigSpace) error {
 	buf, err := readConfigSpace(uint32(request.Bus), uint32(request.Device), uint32(request.Function), 0, 4096)
 
 	if err != nil {
-		logrus.Debugf("pci.ReportConfigSpace(): %s", err.Error())
+		log.Debug().Msgf("pci.ReportConfigSpace(): %s", err.Error())
 		request.Error = common.ServeApiError(common.MapFSErrors(err))
 		return err
 	}
@@ -19,7 +19,7 @@ func reportConfigSpace(request *api.PCIConfigSpace) error {
 }
 
 func ReportConfigSpaces(requests []api.PCIConfigSpace) (err error) {
-	logrus.Traceln("ReportConfigSpaces()")
+	log.Trace().Msg("ReportConfigSpaces()")
 
 	allFailed := true
 	for i := range requests {
@@ -28,7 +28,7 @@ func ReportConfigSpaces(requests []api.PCIConfigSpace) (err error) {
 		allFailed = allFailed && err != nil
 	}
 	if allFailed && len(requests) > 0 {
-		logrus.Warnf("Failed to read PCI configuration space")
+		log.Warn().Msgf("Failed to read PCI configuration space")
 		return
 	}
 	err = nil

@@ -13,20 +13,20 @@ import (
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 // deprecated
 func ReportMACAddresses(macs *api.MACAddresses) error {
-	logrus.Traceln("ReportMACAddresses()")
+	log.Trace().Msg("ReportMACAddresses()")
 
 	m, err := readMACAddresses()
 	if err != nil {
 		// on Windows the WMI calls return their own errors which are
 		// mostly of no interest and just map to err-unknown here
 		macs.Error = common.ServeApiError(common.MapFSErrors(err))
-		logrus.Debugf("netif.ReportMACAddresses(): %s", err.Error())
-		logrus.Warnf("Failed to get MAC addresses")
+		log.Debug().Msgf("netif.ReportMACAddresses(): %s", err.Error())
+		log.Warn().Msgf("Failed to get MAC addresses")
 		return err
 	}
 
@@ -40,7 +40,7 @@ func ReportMACAddresses(macs *api.MACAddresses) error {
 }
 
 func ReportNICs(nics *api.NICList) error {
-	logrus.Traceln("ReportNICs()")
+	log.Trace().Msg("ReportNICs()")
 
 	// get MAC addresses of (hopefully) non-virtual NICs
 	macs, err := readMACAddresses()
@@ -48,8 +48,8 @@ func ReportNICs(nics *api.NICList) error {
 		// on Windows the WMI calls return their own errors which are
 		// mostly of no interest and just map to err-unknown here
 		nics.Error = common.ServeApiError(common.MapFSErrors(err))
-		logrus.Debugf("netif.ReportNICs(): %s", err.Error())
-		logrus.Warnf("Failed to get list of network cards")
+		log.Debug().Msgf("netif.ReportNICs(): %s", err.Error())
+		log.Warn().Msgf("Failed to get list of network cards")
 		return err
 	}
 
@@ -64,8 +64,8 @@ func ReportNICs(nics *api.NICList) error {
 	ifas, err := net.Interfaces()
 	if err != nil {
 		nics.Error = common.ServeApiError(common.MapFSErrors(err))
-		logrus.Debugf("netif.ReportNICs(): %s", err.Error())
-		logrus.Warnf("Failed to get list of network cards")
+		log.Debug().Msgf("netif.ReportNICs(): %s", err.Error())
+		log.Warn().Msgf("Failed to get list of network cards")
 		return err
 	}
 
@@ -86,7 +86,7 @@ func ReportNICs(nics *api.NICList) error {
 		addrs, err := ifa.Addrs()
 		if err != nil {
 			nic.Error = api.UnknownError
-			logrus.Debugf("netif.ReportNICs(): %s", err.Error())
+			log.Debug().Msgf("netif.ReportNICs(): %s", err.Error())
 		}
 		for _, addr := range addrs {
 			ipnet, ok := addr.(*net.IPNet)

@@ -3,7 +3,7 @@ package uefivars
 import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 func hasUEFIVariables() bool {
@@ -16,7 +16,7 @@ func reportUEFIVariable(variable *api.UEFIVariable) error {
 	val, err := readUEFIVariable(variable.Name, variable.Vendor)
 	if err != nil {
 		variable.Error = common.ServeApiError(common.MapFSErrors(err))
-		logrus.Debugf("uefivars.ReportUEFIVariable(): %s", err.Error())
+		log.Debug().Msgf("uefivars.ReportUEFIVariable(): %s", err.Error())
 		return err
 	}
 
@@ -26,10 +26,10 @@ func reportUEFIVariable(variable *api.UEFIVariable) error {
 }
 
 func ReportUEFIVariables(variables []api.UEFIVariable) (err error) {
-	logrus.Traceln("ReportUEFIVariables()")
+	log.Trace().Msg("ReportUEFIVariables()")
 
 	if !hasUEFIVariables() {
-		logrus.Warnln("UEFI variables not accessible")
+		log.Warn().Msg("UEFI variables not accessible")
 		for i := range variables {
 			v := &variables[i]
 			v.Error = api.NotImplemented
@@ -44,7 +44,7 @@ func ReportUEFIVariables(variables []api.UEFIVariable) (err error) {
 		allFailed = allFailed && err != nil
 	}
 	if allFailed && len(variables) > 0 {
-		logrus.Warnf("Failed to access UEFI variables")
+		log.Warn().Msgf("Failed to access UEFI variables")
 		return
 	}
 	err = nil

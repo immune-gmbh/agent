@@ -3,17 +3,17 @@ package acpi
 import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 func ReportACPITables(acpiTables *api.ACPITables) error {
-	logrus.Traceln("ReportACPITables()")
+	log.Trace().Msg("ReportACPITables()")
 
 	t, err := readACPITables()
 	if err != nil {
 		acpiTables.Error = common.ServeApiError(common.MapFSErrors(err))
-		logrus.Debugf("acpi.ReadACPITables(): %s", err.Error())
-		logrus.Warnf("Failed to get ACPI tables")
+		log.Debug().Msgf("acpi.ReadACPITables(): %s", err.Error())
+		log.Warn().Msgf("Failed to get ACPI tables")
 		return err
 	}
 	// map map to cast []byte to api.Buffer

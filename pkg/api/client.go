@@ -17,7 +17,8 @@ import (
 	"time"
 
 	"github.com/google/jsonapi"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 const DefaultHTTPRequestTimeoutSec = 30
@@ -77,7 +78,7 @@ func NewClient(base *url.URL, ca *x509.Certificate, agentVersion string) Client 
 }
 
 func (c *Client) Enroll(ctx context.Context, enrollToken string, enroll Enrollment) ([]*EncryptedCredential, error) {
-	logrus.Traceln("enrolling with SaaS")
+	log.Trace().Msg("enrolling with SaaS")
 	c.Auth = enrollToken
 
 	// encode enrollment
@@ -116,7 +117,7 @@ func (c *Client) Enroll(ctx context.Context, enrollToken string, enroll Enrollme
 }
 
 func (c *Client) Attest(ctx context.Context, quoteCredential string, ev Evidence) (*Appraisal, string, error) {
-	logrus.Traceln("attesting to SaaS")
+	log.Trace().Msg("attesting to SaaS")
 	c.Auth = quoteCredential
 
 	pdoc, err := jsonapi.Marshal(&ev)
@@ -200,7 +201,7 @@ func (c *Client) Post(ctx context.Context, route string, doc interface{}) (jsona
 
 	for i := 0; i < 3; i += 1 {
 		if i > 0 {
-			logrus.Warnf("Retry %v/3", i+1)
+			log.Warn().Msgf("Retry %v/3", i+1)
 		}
 		ctx, cancel := context.WithTimeout(ctx, c.PostRequestTimeout)
 		defer cancel()
@@ -221,7 +222,7 @@ func (c *Client) Get(ctx context.Context, route string, ifModifiedSince *time.Ti
 
 	for i := 0; i < 3; i += 1 {
 		if i > 0 {
-			logrus.Warnf("Retry %v/3", i+1)
+			log.Warn().Msgf("Retry %v/3", i+1)
 		}
 		ctx, cancel := context.WithTimeout(ctx, c.HTTPRequestTimeout)
 		defer cancel()
@@ -247,7 +248,7 @@ func (c *Client) doPost(ctx context.Context, route string, doc interface{}) (jso
 	if err != nil {
 		return nil, FormatError
 	}
-	logrus.Debugf("POST %s", endpoint.String())
+	log.Debug().Msgf("POST %s", endpoint.String())
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), pipe)
 	if err != nil {
@@ -272,7 +273,7 @@ func (c *Client) doGet(ctx context.Context, route string, ifModifiedSince *time.
 		req.Header.Set("If-Modified-Since", ifModifiedSince.UTC().Format(http.TimeFormat))
 	}
 
-	logrus.Debugf("GET %s", endpoint.String())
+	log.Debug().Msgf("GET %s", endpoint.String())
 	return c.doRequest(req)
 }
 
@@ -288,17 +289,17 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		logrus.Debugf("HTTP response: %s", err)
+		log.Debug().Msgf("HTTP response: %s", err)
 		return nil, NetworkError
 	}
 	defer resp.Body.Close()
 
 	code := resp.StatusCode
-	logrus.Debugf("HTTP status: %d", code)
+	log.Debug().Msgf("HTTP status: %d", code)
 
 	var readBody bool
 	var retErr error
-	debugging := logrus.GetLevel() == logrus.TraceLevel
+	debugging := zerolog.GlobalLevel() == zerolog.TraceLevel
 
 	switch {
 	// server tells us to use cached response and sends no body
@@ -338,9 +339,9 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 
 	if readBody {
 		respBytes, err := io.ReadAll(resp.Body)
-		logrus.Debugf("HTTP body: %s", string(respBytes)) // always try to print anything we got
+		log.Debug().Msgf("HTTP body: %s", string(respBytes)) // always try to print anything we got
 		if err != nil {
-			logrus.Debugf("Reading server response: %s", err)
+			log.Debug().Msgf("Reading server response: %s", err)
 			return nil, NetworkError
 		}
 
@@ -356,7 +357,7 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 				if retErr == nil {
 					retErr = FormatError
 				}
-				logrus.Debugf("Wrong HTTP content type: %v", ctype)
+				log.Debug().Msgf("Wrong HTTP content type: %v", ctype)
 				return nil, retErr
 			}
 		}
@@ -365,7 +366,7 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 		if err = json.Unmarshal(respBytes, &one); err != nil {
 			var many jsonapi.ManyPayload
 			if err = json.Unmarshal(respBytes, &many); err != nil {
-				logrus.Debugf("Parsing server response: %s", err)
+				log.Debug().Msgf("Parsing server response: %s", err)
 				return nil, ServerError
 			} else {
 				return &many, retErr

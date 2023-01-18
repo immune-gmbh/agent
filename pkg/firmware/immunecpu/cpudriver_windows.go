@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/immune-gmbh/agent/v3/pkg/util"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sys/windows"
 )
 
@@ -48,7 +48,7 @@ func CreateService() error {
 func RemoveService() error {
 	err := util.DeleteDriverService(DriverServiceName)
 	if err != nil {
-		logrus.Debugf("failed removing immuneCPU: %s", err)
+		log.Debug().Msgf("failed removing immuneCPU: %s", err)
 	}
 	return err
 }
@@ -56,7 +56,7 @@ func RemoveService() error {
 func StopDriver() error {
 	err := util.StopDriver(DriverServiceName)
 	if err != nil {
-		logrus.Debugf("failed stopping immuneCPU: %s", err)
+		log.Debug().Msgf("failed stopping immuneCPU: %s", err)
 	}
 	return err
 }

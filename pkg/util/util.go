@@ -7,7 +7,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 	"github.com/klauspost/compress/zstd"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 func Uint32ToStr(in uint32) string {
@@ -39,13 +39,13 @@ func ZStdFile(file string) ([]byte, error) {
 func FileToHashBlob(file string) api.HashBlob {
 	digest, err := SHA256File(file)
 	if err != nil {
-		logrus.Debugf("util.SHA256File(): %s %s", file, err.Error())
+		log.Debug().Msgf("util.SHA256File(): %s %s", file, err.Error())
 		return api.HashBlob{Error: common.ServeApiError(common.MapFSErrors(err))}
 	}
 
 	zData, err := ZStdFile(file)
 	if err != nil {
-		logrus.Debugf("util.ZStdFile(): %s %s", file, err.Error())
+		log.Debug().Msgf("util.ZStdFile(): %s %s", file, err.Error())
 		return api.HashBlob{Error: common.ServeApiError(common.MapFSErrors(err))}
 	}
 

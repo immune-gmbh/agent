@@ -11,7 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sys/windows"
 )
 
@@ -57,7 +57,7 @@ func openMEI(path string, clientGUID uuid.UUID) (*meiClient, error) {
 		return nil, fmt.Errorf("failed to open HECI device: %w", err)
 	}
 
-	logrus.Tracef("Connecting MEI client %v\n", clientGUID.String())
+	log.Trace().Msgf("Connecting MEI client %v\n", clientGUID.String())
 	data, err := connectClientGUID(h, clientGUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect ME client: %w", err)
@@ -77,7 +77,7 @@ func openMEI(path string, clientGUID uuid.UUID) (*meiClient, error) {
 	m.maxMsgLength = binary.LittleEndian.Uint32(data[:4])
 	m.protoVersion = int(uint8(data[4]))
 
-	logrus.Tracef("Opened MEI: %#v", m)
+	log.Trace().Msgf("Opened MEI: %#v", m)
 	return &m, nil
 }
 

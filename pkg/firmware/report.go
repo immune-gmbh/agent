@@ -28,14 +28,14 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/uefivars"
 	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/immune-gmbh/agent/v3/pkg/util"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 // GatherFirmwareData passes the server-sent configuration leafs to the appropriate report sub-functions.
 // Error handling and logging is mostly left to the leaf functions. If part of the report fails, it is
 // simply omitted. Errors that are meaningful for the SaaS are stored in the error members of the api structs.
 func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) (api.FirmwareProperties, error) {
-	logrus.Trace("start gathering firmware data")
+	log.Trace().Msg("start gathering firmware data")
 
 	var fwData api.FirmwareProperties
 	cpuVendor := cpuid.Vendor()
@@ -43,8 +43,8 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	// Get ourselves windows security permissions to read UEFI vars
 	err := util.WinAddTokenPrivilege("SeSystemEnvironmentPrivilege")
 	if err != nil {
-		logrus.Debugf("util.WinAddTokenPrivilege(): %s", err.Error())
-		logrus.Warnf("Failed to get windows security permissions to read UEFI variables")
+		log.Debug().Msgf("util.WinAddTokenPrivilege(): %s", err.Error())
+		log.Warn().Msgf("Failed to get windows security permissions to read UEFI variables")
 	}
 
 	// stop cpu driver once before it is used to ensure we always load a fresh version
@@ -56,8 +56,8 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 	immunecpu.RemoveService()
 	err = immunecpu.CreateService()
 	if err != nil {
-		logrus.Debugf("immunecpu.CreateService(): %s", err.Error())
-		logrus.Warnf("Failed to install immune Guard reporting driver")
+		log.Debug().Msgf("immunecpu.CreateService(): %s", err.Error())
+		log.Warn().Msgf("Failed to install immune Guard reporting driver")
 	}
 
 	// clean up every time
@@ -165,12 +165,12 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 		}
 	}
 
-	logrus.Traceln("done gathering report data")
+	log.Trace().Msg("done gathering report data")
 	return fwData, nil
 }
 
 func ReportTPM2Properties(properties []api.TPM2Property, tpmConn io.ReadWriteCloser) (err error) {
-	logrus.Traceln("ReportTPM2Properties()")
+	log.Trace().Msg("ReportTPM2Properties()")
 
 	if tpmConn != nil {
 		allFailed := true
@@ -180,13 +180,13 @@ func ReportTPM2Properties(properties []api.TPM2Property, tpmConn io.ReadWriteClo
 			allFailed = allFailed && err != nil
 			if err != nil {
 				v.Error = common.ServeApiError(err)
-				logrus.Debugf("tcg.Property(): %s", err.Error())
+				log.Debug().Msgf("tcg.Property(): %s", err.Error())
 			} else {
 				v.Value = &val
 			}
 		}
 		if allFailed && len(properties) > 0 {
-			logrus.Warnf("Failed to get TPM 2.0 properties")
+			log.Warn().Msgf("Failed to get TPM 2.0 properties")
 			return
 		}
 		err = nil
@@ -200,12 +200,12 @@ func ReportTPM2Properties(properties []api.TPM2Property, tpmConn io.ReadWriteClo
 }
 
 func ReportAgentHash(agentInfo *api.Agent) (err error) {
-	logrus.Traceln("ReportAgentHash()")
+	log.Trace().Msg("ReportAgentHash()")
 	defer func() {
 		if err != nil {
 			agentInfo.ImageSHA2.Error = common.ServeApiError(common.MapFSErrors(err))
-			logrus.Debugf("firmware.ReportAgentHash(): %s", err.Error())
-			logrus.Warnln("Failed to compute executable image hash")
+			log.Debug().Msgf("firmware.ReportAgentHash(): %s", err.Error())
+			log.Warn().Msg("Failed to compute executable image hash")
 		}
 	}()
 

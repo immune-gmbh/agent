@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpmutil"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -49,13 +49,13 @@ func (a *TCGAnchor) ReadEKCertificate() (*x509.Certificate, error) {
 func doReadEKCertificate(conn io.ReadWriteCloser, handle tpmutil.Handle) (*x509.Certificate, error) {
 	blob, err := tpm2.NVRead(conn, handle)
 	if err != nil {
-		log.Debugf("Cannot read EK certificate: %s", err)
+		log.Debug().Msgf("Cannot read EK certificate: %s", err)
 		return nil, err
 	}
 
 	certRef, err := x509.ParseCertificate(blob)
 	if err != nil {
-		log.Debugf("Cannot parse EK certificate: %s", err)
+		log.Debug().Msgf("Cannot parse EK certificate: %s", err)
 		return nil, err
 	}
 
@@ -65,16 +65,16 @@ func doReadEKCertificate(conn io.ReadWriteCloser, handle tpmutil.Handle) (*x509.
 func (a *TCGAnchor) GetEndorsementKey() (Handle, tpm2.Public, error) {
 	ekPublic, err := loadEK(a.Conn, defaultEKHandle)
 	if err != nil {
-		log.Debugf("No EK found at 0x%x, trying to generate it.", defaultEKHandle)
+		log.Debug().Msgf("No EK found at 0x%x, trying to generate it.", defaultEKHandle)
 
 		defaultEKHandle, ekPublic, err = generateAndLoadEK(a.Conn, &defaultEKTemplateIndex)
 		if err != nil {
-			log.Debugf("No EK template found at 0x%x, using default template", defaultEKTemplateIndex)
+			log.Debug().Msgf("No EK template found at 0x%x, using default template", defaultEKTemplateIndex)
 
 			// Retry with default EK template
 			defaultEKHandle, ekPublic, err = generateAndLoadEK(a.Conn, nil)
 			if err != nil {
-				log.Debugf("Failed to load EK: %s. Tried to read EK template from 0x%x and to use the default EK template. Maybe the template it at a non-standard NV index?", err, defaultEKTemplateIndex)
+				log.Debug().Msgf("Failed to load EK: %s. Tried to read EK template from 0x%x and to use the default EK template. Maybe the template it at a non-standard NV index?", err, defaultEKTemplateIndex)
 				return nil, tpm2.Public{}, err
 			}
 		}
@@ -96,26 +96,26 @@ func generateAndLoadEK(conn io.ReadWriteCloser, template *tpmutil.Handle) (tpmut
 	if template != nil {
 		tmpl, err := tpm2.NVRead(conn, *template)
 		if err != nil {
-			log.Debugf("Failed to fetch EK template: %v", err)
+			log.Debug().Msgf("Failed to fetch EK template: %v", err)
 			return handle, pub, err
 		}
 
 		pub, err = tpm2.DecodePublic(tmpl)
 		if err != nil {
-			log.Debugf("EK template is not a TPM2_PUBLIC: %v", err)
+			log.Debug().Msgf("EK template is not a TPM2_PUBLIC: %v", err)
 			return handle, pub, err
 		}
 	}
 
 	handle, _, err = tpm2.CreatePrimary(conn, tpm2.HandleEndorsement, tpm2.PCRSelection{}, "", "", defaultEKTemplate)
 	if err != nil {
-		log.Debugf("Failed to create EK: %v", err)
+		log.Debug().Msgf("Failed to create EK: %v", err)
 		return handle, pub, err
 	}
 
 	pub, _, _, err = tpm2.ReadPublic(conn, handle)
 	if err != nil {
-		log.Debugf("Failed to read EKs public part: %v", err)
+		log.Debug().Msgf("Failed to read EKs public part: %v", err)
 		return handle, pub, err
 	}
 

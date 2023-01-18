@@ -5,7 +5,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sys/windows"
 )
 
@@ -185,7 +185,7 @@ func ListPPLProcessImagePaths() ([]string, error) {
 		if err == nil {
 			list = append(list, name)
 		} else {
-			logrus.Tracef("epp.getFullImagePathOnlyIfPPLProc(): procId #%v %s", id, err.Error())
+			log.Trace().Msgf("epp.getFullImagePathOnlyIfPPLProc(): procId #%v %s", id, err.Error())
 		}
 	}
 

@@ -2,20 +2,20 @@ package ima
 
 import (
 	"github.com/klauspost/compress/zstd"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 )
 
-func ReportIMALog(log *api.ErrorBuffer) error {
-	logrus.Traceln("ReportIMALog()")
+func ReportIMALog(imaLog *api.ErrorBuffer) error {
+	log.Trace().Msg("ReportIMALog()")
 
 	buf, err := readIMALog()
 	if err != nil {
-		logrus.Debugf("ima.ReportIMALog(): %s", err.Error())
-		logrus.Warnf("Failed to read Linux IMA runtime measurement log")
-		log.Error = common.ServeApiError(common.MapFSErrors(err))
+		log.Debug().Msgf("ima.ReportIMALog(): %s", err.Error())
+		log.Warn().Msgf("Failed to read Linux IMA runtime measurement log")
+		imaLog.Error = common.ServeApiError(common.MapFSErrors(err))
 		return err
 	}
 
@@ -23,6 +23,6 @@ func ReportIMALog(log *api.ErrorBuffer) error {
 	if err != nil {
 		return err
 	}
-	log.Data = encoder.EncodeAll(buf, make([]byte, 0, len(buf)))
+	imaLog.Data = encoder.EncodeAll(buf, make([]byte, 0, len(buf)))
 	return nil
 }

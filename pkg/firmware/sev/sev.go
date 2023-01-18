@@ -3,13 +3,13 @@ package sev
 import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 func reportSEVCommand(cmd *api.SEVCommand) error {
 	val, err := runSEVCommand(cmd.Command, cmd.ReadLength)
 	if err != nil {
-		logrus.Debugf("sev.ReportSEVCommand(): %s", err.Error())
+		log.Debug().Msgf("sev.ReportSEVCommand(): %s", err.Error())
 		cmd.Error = common.ServeApiError(common.MapFSErrors(err))
 		return err
 	}
@@ -20,7 +20,7 @@ func reportSEVCommand(cmd *api.SEVCommand) error {
 }
 
 func ReportSEVCommands(cmds []api.SEVCommand) (err error) {
-	logrus.Traceln("ReportSEVCommands()")
+	log.Trace().Msg("ReportSEVCommands()")
 
 	allFailed := true
 	for i := range cmds {
@@ -29,7 +29,7 @@ func ReportSEVCommands(cmds []api.SEVCommand) (err error) {
 		allFailed = allFailed && err != nil
 	}
 	if allFailed && len(cmds) > 0 {
-		logrus.Warnf("Failed to access AMD SecureProcessor")
+		log.Warn().Msgf("Failed to access AMD SecureProcessor")
 		return
 	}
 
