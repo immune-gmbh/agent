@@ -92,12 +92,13 @@ func (m *agentService) runAttest() time.Duration {
 	// try to update our config for each attest we do
 	// we could mostly encounter IO errors here but we should be able
 	// to run attest anyway, so we just let UpdateConfig log the error
-	m.core.UpdateConfig()
+	if err := m.core.UpdateConfig(); err != nil {
+		core.LogUpdateConfigErrors(&log.Logger, err)
+	}
 
 	// run attest and retry with exponential backoff in case of error
-	_, _, err := m.core.Attest(ctx, "", false)
-	if err != nil {
-		// XXX need to log user visible errors here; core only logs belor error
+	if _, _, err := m.core.Attest(ctx, "", false); err != nil {
+		core.LogAttestErrors(&log.Logger, err)
 		return m.backoff.Increase()
 	}
 	m.backoff.Reset()
@@ -136,7 +137,7 @@ func RunService() int {
 	// init agent core
 	agentCore := core.NewCore()
 	if err := agentCore.Init(state.DefaultStateDir(), "", nil, &log.Logger); err != nil {
-		// XXX need to log user visible errors here; core only logs below error
+		core.LogInitErrors(&log.Logger, err)
 		return 1
 	}
 
