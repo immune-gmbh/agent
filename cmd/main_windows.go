@@ -7,7 +7,7 @@ import (
 
 	"github.com/immune-gmbh/agent/v3/pkg/cli"
 	"github.com/immune-gmbh/agent/v3/pkg/winsvc"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sys/windows/svc"
 )
 
@@ -18,7 +18,7 @@ func main() {
 func run() int {
 	isService, err := svc.IsWindowsService()
 	if err != nil {
-		logrus.Error("failed to determine if agent is running as windows service")
+		log.Error().Msg("failed to determine if agent is running as windows service")
 		return 1
 	}
 

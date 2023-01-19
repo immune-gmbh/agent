@@ -14,7 +14,6 @@ require (
 	github.com/digitalocean/go-smbios v0.0.0-20180907143718-390a4f403a8e
 	github.com/fatih/color v1.13.0
 	github.com/fearful-symmetry/gomsr v0.0.1
-	github.com/freman/eventloghook v0.0.0-20191003051739-e4d803b6b48b
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/google/go-licenses v1.0.0
 	github.com/google/go-tpm v0.3.3
@@ -26,7 +25,6 @@ require (
 	github.com/mattn/go-isatty v0.0.16
 	github.com/rs/zerolog v1.28.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
 	github.com/yusufpapurcu/wmi v1.2.2
 	golang.org/x/sys v0.3.0
