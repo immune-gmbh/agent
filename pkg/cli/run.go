@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"net/url"
 	"os"
 	"runtime"
@@ -131,31 +130,14 @@ func RunCommandLineTool() int {
 
 	// init agent core
 	if err := agentCore.Init(cli.StateDir, cli.CA, cli.Server, &log.Logger); err != nil {
-		if errors.Is(err, core.ErrApiUrl) {
-			log.Error().Msg("Invalid server URL.")
-		} else if errors.Is(err, core.ErrStateDir) {
-			log.Error().Msgf("Can't create or write state directory, check permissions: %s", cli.StateDir)
-		} else if errors.Is(err, state.ErrNoPerm) {
-			log.Error().Msg("Cannot read state, no permissions.")
-		} else if errors.Is(err, core.ErrStateLoad) {
-			log.Error().Msg("Failed to load state.")
-		} else if errors.Is(err, core.ErrStateStore) {
-			log.Error().Msg("Failed to store state.")
-		} else {
-			log.Error().Msg("Unknown error occured during initialization.")
-		}
-
+		core.LogInitErrors(&log.Logger, err)
 		tui.DumpErr()
 		return 1
 	}
 
 	// be sure to run this after we have a client
 	if err := agentCore.UpdateConfig(); err != nil {
-		if errors.Is(err, core.ErrUpdateConfig) {
-			log.Error().Msg("Failed to load configuration from server")
-		} else {
-			log.Error().Msg("Unknown error occured during config update")
-		}
+		core.LogUpdateConfigErrors(&log.Logger, err)
 		tui.DumpErr()
 		return 1
 	}
