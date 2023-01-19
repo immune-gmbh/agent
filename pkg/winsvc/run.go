@@ -7,12 +7,11 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/freman/eventloghook"
 	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/immune-gmbh/agent/v3/pkg/util"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/eventlog"
 )
@@ -113,7 +112,16 @@ func RunService() int {
 		return 255
 	}
 	defer elog.Close()
-	logrus.AddHook(eventloghook.NewHook(elog))
+
+	// configure logging and redirect global logger output to event log
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	ew := &eventLogWriter{
+		elog: elog,
+		cw: &zerolog.ConsoleWriter{
+			NoColor: true, PartsExclude: []string{zerolog.LevelFieldName, zerolog.TimestampFieldName},
+		},
+	}
+	log.Logger = log.Logger.Output(zerolog.SyncWriter(ew))
 
 	// bail out if not root
 	root, err := util.IsRoot()
@@ -128,7 +136,7 @@ func RunService() int {
 	// init agent core
 	agentCore := core.NewCore()
 	if err := agentCore.Init(state.DefaultStateDir(), "", nil, &log.Logger); err != nil {
-		// XXX need to log user visible errors here; core only logs belor error
+		// XXX need to log user visible errors here; core only logs below error
 		return 1
 	}
 
