@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"github.com/armon/circbuf"
+	"github.com/fatih/color"
 	"github.com/mattn/go-colorable"
 )
 
@@ -14,9 +15,12 @@ var (
 	Err io.Writer = io.Discard
 )
 
-func Init() {
+func Init(noColor bool) {
 	Out = colorable.NewColorableStdout()
 	Err, _ = circbuf.NewBuffer(1024 * 128)
+	color.Output = Out
+	color.Error = Err
+	color.NoColor = noColor
 
 	if runtime.GOOS == "windows" {
 		CheckMark = "o"

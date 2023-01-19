@@ -60,23 +60,22 @@ func initUI(forceColors bool, forceLog bool) {
 	_, noColors := os.LookupEnv("NO_COLOR")
 
 	cw := zerolog.ConsoleWriter{
-		Out:        colorable.NewColorableStdout(),
+		Out:        nil,
 		NoColor:    false,
 		TimeFormat: "15:04:05"}
 
 	// handle different console environments
 	// if tui is disabled, then the log is our ui; so we use stdout
-	if forceColors || (!notty && !noColors) {
-		cw.NoColor = false
-		cw.Out = colorable.NewColorableStdout()
-	} else {
-		cw.NoColor = noColors && !forceColors
+	cw.NoColor = (noColors || notty) && !forceColors
+	if cw.NoColor {
 		cw.Out = os.Stdout
+	} else {
+		cw.Out = colorable.NewColorableStdout()
 	}
 
 	// use tui instead of log as ui
 	if !forceLog && !notty {
-		tui.Init()
+		tui.Init(cw.NoColor)
 		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 		cw.Out = tui.Err
 	}
@@ -90,6 +89,9 @@ func RunCommandLineTool() int {
 
 	// add info about build to description
 	desc := programDesc + " " + *agentCore.ReleaseId + " (" + runtime.GOARCH + ")"
+
+	// set default log level before kong possibly overrides it
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
 	// Dynamically build Kong options
 	options := []kong.Option{
