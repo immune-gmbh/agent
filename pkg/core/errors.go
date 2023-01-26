@@ -75,6 +75,8 @@ func LogInitErrors(l *zerolog.Logger, err error) {
 func LogUpdateConfigErrors(l *zerolog.Logger, err error) {
 	if errors.Is(err, ErrUpdateConfig) {
 		l.Error().Msg("Failed to load configuration from server")
+	} else if errors.Is(err, ErrStateStore) {
+		l.Error().Msg("Failed to store state.")
 	} else {
 		l.Error().Msg("Unknown error occured during config update")
 	}
