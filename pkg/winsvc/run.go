@@ -97,7 +97,7 @@ func (m *agentService) runAttest() time.Duration {
 	}
 
 	// run attest and retry with exponential backoff in case of error
-	if _, _, err := m.core.Attest(ctx, "", false); err != nil {
+	if err := m.core.Attest(ctx, "", false); err != nil {
 		core.LogAttestErrors(&log.Logger, err)
 		return m.backoff.Increase()
 	}
@@ -143,11 +143,6 @@ func RunService() int {
 
 	if !agentCore.State.IsEnrolled() {
 		log.Error().Msg("No previous state found, please enroll first.")
-		return 1
-	}
-
-	if err := agentCore.OpenTPM(); err != nil {
-		log.Error().Msgf("Cannot open TPM: %s", agentCore.State.TPM)
 		return 1
 	}
 

@@ -27,6 +27,8 @@ var (
 	ErrUpdateConfig    = errors.New("fetch config from server")
 )
 
+// XXX these log functions are more part of tui package
+
 // LogAttestErrors is a helper function to translate errors to text and log them directly
 func LogAttestErrors(l *zerolog.Logger, err error) {
 	if errors.Is(err, api.AuthError) {
