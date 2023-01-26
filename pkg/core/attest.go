@@ -62,7 +62,13 @@ func (ac *AttestationClient) readAllPCRBanks(ctx context.Context) ([]int, map[st
 	return toQuoteInts, allPCRs, nil
 }
 
-func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, dryRun bool) (*api.Appraisal, string, error) {
+func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, dryRun bool) error {
+	if err := ac.OpenTPM(); err != nil {
+		ac.Log.Error().Msgf("Cannot open TPM: %s", ac.State.TPM)
+		// XXX return proper error dont log here
+		return err
+	}
+
 	var conn io.ReadWriteCloser
 	if anch, ok := ac.Anchor.(*tcg.TCGAnchor); ok {
 		conn = anch.Conn
@@ -78,19 +84,19 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	fwPropsJSON, err := json.Marshal(fwProps)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("json.Marshal(FirmwareProperties)")
-		return nil, "", ErrEncodeJson
+		return ErrEncodeJson
 	}
 	fwPropsJCS, err := jcs.Transform(fwPropsJSON)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("jcs.Transform(FirmwareProperties)")
-		return nil, "", ErrEncodeJson
+		return ErrEncodeJson
 	}
 	fwPropsHash := sha256.Sum256(fwPropsJCS)
 
 	toQuote, allPCRs, err := ac.readAllPCRBanks(ctx)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("readAllPCRBanks()")
-		return nil, "", ErrReadPcr
+		return ErrReadPcr
 	}
 
 	// load Root key
@@ -99,7 +105,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	rootHandle, rootPub, err := ac.Anchor.CreateAndLoadRoot(ac.EndorsementAuth, ac.State.Root.Auth, &ac.State.Config.Root.Public)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("tcg.CreateAndLoadRoot(..)")
-		return nil, "", ErrRootKey
+		return ErrRootKey
 	}
 	defer rootHandle.Flush(ac.Anchor)
 
@@ -107,23 +113,23 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	rootName, err := api.ComputeName(rootPub)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("Name(rootPub)")
-		return nil, "", ErrRootKey
+		return ErrRootKey
 	}
 
 	// check the root name. this will change if the endorsement proof value is changed
 	if !api.EqualNames(&rootName, &ac.State.Root.Name) {
-		return nil, "", ErrRootKey
+		return ErrRootKey
 	}
 
 	// load AIK
 	aik, ok := ac.State.Keys["aik"]
 	if !ok {
-		return nil, "", ErrAik
+		return ErrAik
 	}
 	aikHandle, err := ac.Anchor.LoadDeviceKey(rootHandle, ac.State.Root.Auth, aik.Public, aik.Private)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("LoadDeviceKey(..)")
-		return nil, "", ErrAik
+		return ErrAik
 	}
 	defer aikHandle.Flush(ac.Anchor)
 	rootHandle.Flush(ac.Anchor)
@@ -134,7 +140,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 		alg, err := strconv.ParseInt(k, 10, 16)
 		if err != nil {
 			ac.Log.Debug().Err(err).Msg("ParseInt failed")
-			return nil, "", ErrQuote
+			return ErrQuote
 		}
 		algs = append(algs, tpm2.Algorithm(alg))
 	}
@@ -144,7 +150,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	quote, sig, err := ac.Anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuote)
 	if err != nil || (sig.ECC == nil && sig.RSA == nil) {
 		ac.Log.Debug().Err(err).Msg("TPM2_Quote failed")
-		return nil, "", ErrQuote
+		return ErrQuote
 	}
 	aikHandle.Flush(ac.Anchor)
 
@@ -168,7 +174,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	evidenceJSON, err := json.Marshal(evidence)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("json.Marshal(Evidence)")
-		return nil, "", ErrEncodeJson
+		return ErrEncodeJson
 	}
 
 	// XXX this should be handled outside of attest
@@ -177,19 +183,19 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	} else if dumpEvidenceTo != "" {
 		path := dumpEvidenceTo + ".evidence.json"
 		if err := os.WriteFile(path, evidenceJSON, 0644); err != nil {
-			return nil, "", err
+			return err
 		}
 		ac.Log.Info().Msgf("Dumped evidence json: %s", path)
 	}
 
 	if dryRun {
-		return nil, "", nil
+		return nil
 	}
 
 	// API call
 	tui.SetUIState(tui.StSendEvidence)
 	ac.Log.Info().Msg("Sending report to immune Guard cloud")
-	attestResp, webLink, err := ac.Client.Attest(ctx, aik.Credential, evidence)
+	attestResponse, webLink, err := ac.Client.Attest(ctx, aik.Credential, evidence)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("client.Attest(..)")
 
@@ -202,8 +208,61 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 			err = ErrUnknown
 		}
 
-		return nil, "", err
+		return err
 	}
 
-	return attestResp, webLink, nil
+	// process response and update UI accordingly
+	inProgress := attestResponse == nil
+	if inProgress {
+		tui.SetUIState(tui.StAttestationRunning)
+		ac.Log.Info().Msg("Attestation in progress, results become available later")
+		tui.ShowAppraisalLink(webLink)
+		if webLink != "" {
+			ac.Log.Info().Msgf("See detailed results here: %s", webLink)
+		}
+		return nil
+	} else {
+		tui.SetUIState(tui.StAttestationSuccess)
+		ac.Log.Info().Msg("Attestation successful")
+	}
+
+	// setting these states will just toggle internal flags in tui
+	// which later affect the trust chain render
+	if attestResponse.Verdict.SupplyChain == api.Unsupported {
+		tui.SetUIState(tui.StTscUnsupported)
+	}
+	if attestResponse.Verdict.EndpointProtection == api.Unsupported {
+		tui.SetUIState(tui.StEppUnsupported)
+	}
+
+	if attestResponse.Verdict.Result == api.Trusted {
+		tui.SetUIState(tui.StDeviceTrusted)
+		tui.SetUIState(tui.StChainAllGood)
+	} else {
+		tui.SetUIState(tui.StDeviceVulnerable)
+		if attestResponse.Verdict.SupplyChain == api.Vulnerable {
+			tui.SetUIState(tui.StChainFailSupplyChain)
+		} else if attestResponse.Verdict.Configuration == api.Vulnerable {
+			tui.SetUIState(tui.StChainFailConfiguration)
+		} else if attestResponse.Verdict.Firmware == api.Vulnerable {
+			tui.SetUIState(tui.StChainFailFirmware)
+		} else if attestResponse.Verdict.Bootloader == api.Vulnerable {
+			tui.SetUIState(tui.StChainFailBootloader)
+		} else if attestResponse.Verdict.OperatingSystem == api.Vulnerable {
+			tui.SetUIState(tui.StChainFailOperatingSystem)
+		} else if attestResponse.Verdict.EndpointProtection == api.Vulnerable {
+			tui.SetUIState(tui.StChainFailEndpointProtection)
+		}
+	}
+
+	tui.ShowAppraisalLink(webLink)
+	if webLink != "" {
+		ac.Log.Info().Msgf("See detailed results here: %s", webLink)
+	}
+
+	if appraisal, err := json.MarshalIndent(*attestResponse, "", "  "); err == nil {
+		ac.Log.Debug().Msg(string(appraisal))
+	}
+
+	return nil
 }

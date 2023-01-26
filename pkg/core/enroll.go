@@ -22,6 +22,7 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM 
 
 	// open and close TPM on demand
 	if err := ac.OpenTPM(); err != nil {
+		// XXX return real error
 		ac.Log.Error().Msgf("Cannot open TPM: %s", ac.State.TPM)
 
 		// don't show tpm step in tui when we don't use a tpm
