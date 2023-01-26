@@ -7,8 +7,6 @@ import (
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/core"
-	"github.com/immune-gmbh/agent/v3/pkg/state"
-	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 	"github.com/rs/zerolog/log"
 )
@@ -24,31 +22,7 @@ type enrollCmd struct {
 func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 	ctx := context.Background()
 
-	// store used TPM in state, use dummy TPM only if forced
-	if enroll.DummyTPM {
-		agentCore.State.TPM = state.DummyTPMIdentifier
-	} else {
-		agentCore.State.TPM = enroll.TPM
-	}
-
-	if err := agentCore.OpenTPM(); err != nil {
-		log.Error().Msgf("Cannot open TPM: %s", agentCore.State.TPM)
-
-		// don't show tpm step in tui when we don't use a tpm
-		if agentCore.State.TPM != state.DummyTPMIdentifier {
-			tui.SetUIState(tui.StSelectTAFailed)
-		}
-		return err
-	}
-	tui.SetUIState(tui.StSelectTASuccess)
-
-	// when server is set on cmdline during enroll store it in state
-	// so OS startup scripts can attest without needing to know the server URL
-	if agentCore.Server != nil {
-		agentCore.State.ServerURL = agentCore.Server
-	}
-
-	if err := agentCore.Enroll(ctx, enroll.Token); err != nil {
+	if err := agentCore.Enroll(ctx, enroll.Token, enroll.DummyTPM, enroll.TPM); err != nil {
 		if errors.Is(err, api.AuthError) {
 			log.Error().Msg("Failed enrollment with an authentication error. Make sure the enrollment token is correct.")
 		} else if errors.Is(err, api.FormatError) {
@@ -69,28 +43,13 @@ func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 			log.Error().Msg("Internal error during enrollment.")
 		} else if errors.Is(err, core.ErrApiResponse) {
 			log.Error().Msg("Server resonse not understood. Is your agent up-to-date?")
+		} else if errors.Is(err, core.ErrStateStore) {
+			log.Error().Msg("Failed to store state.")
 		} else if err != nil {
 			log.Error().Msg("Enrollment failed. An unknown error occured. Please try again later.")
 		}
 
 		tui.SetUIState(tui.StEnrollFailed)
-		return err
-	}
-
-	// incorporate dummy TPM state
-	if stub, ok := agentCore.Anchor.(*tcg.SoftwareAnchor); ok {
-		if st, err := stub.Store(); err != nil {
-			log.Debug().Err(err).Msg("SoftwareAnchor.Store")
-			log.Error().Msg("Failed to save stub TPM state to disk")
-		} else {
-			agentCore.State.StubState = st
-		}
-	}
-
-	// save the new state to disk
-	if err := agentCore.State.Store(agentCore.StatePath); err != nil {
-		log.Debug().Err(err).Msgf("State.Store(%s)", agentCore.StatePath)
-		log.Error().Msg("Failed to save activated keys to disk")
 		return err
 	}
 

@@ -12,7 +12,33 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 )
 
-func (ac *AttestationClient) Enroll(ctx context.Context, token string) error {
+func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM bool, tpmPath string) error {
+	// store used TPM in state, use dummy TPM only if forced
+	if dummyTPM {
+		ac.State.TPM = state.DummyTPMIdentifier
+	} else {
+		ac.State.TPM = tpmPath
+	}
+
+	// open and close TPM on demand
+	if err := ac.OpenTPM(); err != nil {
+		ac.Log.Error().Msgf("Cannot open TPM: %s", ac.State.TPM)
+
+		// don't show tpm step in tui when we don't use a tpm
+		if ac.State.TPM != state.DummyTPMIdentifier {
+			tui.SetUIState(tui.StSelectTAFailed)
+		}
+		return err
+	}
+	// XXX close TPM here
+	tui.SetUIState(tui.StSelectTASuccess)
+
+	// when server override is set during enroll store it in state
+	// so OS startup scripts can attest without needing to know the server URL
+	if ac.Server != nil {
+		ac.State.ServerURL = ac.Server
+	}
+
 	tui.SetUIState(tui.StCreateKeys)
 	ac.Log.Info().Msg("Creating Endorsement key")
 	ekHandle, ekPub, err := ac.Anchor.GetEndorsementKey()
@@ -153,6 +179,22 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string) error {
 		key := ac.State.Keys[keyName]
 		key.Credential = keyCred
 		ac.State.Keys[keyName] = key
+	}
+
+	// incorporate dummy TPM state
+	if stub, ok := ac.Anchor.(*tcg.SoftwareAnchor); ok {
+		if st, err := stub.Store(); err != nil {
+			ac.Log.Debug().Err(err).Msg("SoftwareAnchor.Store")
+			return ErrStateStore
+		} else {
+			ac.State.StubState = st
+		}
+	}
+
+	// save the new state to disk
+	if err := ac.State.Store(ac.StatePath); err != nil {
+		ac.Log.Debug().Err(err).Msgf("State.Store(%s)", ac.StatePath)
+		return ErrStateStore
 	}
 
 	return nil
