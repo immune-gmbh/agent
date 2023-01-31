@@ -51,6 +51,8 @@ func LogAttestErrors(l *zerolog.Logger, err error) {
 		l.Error().Msg("No key suitable for attestation found, please enroll first.")
 	} else if errors.Is(err, ErrQuote) {
 		l.Error().Msg("TPM 2.0 attestation failed.")
+	} else if errors.Is(err, ErrOpenTrustAnchor) {
+		l.Error().Msg("Cannot open TPM")
 	} else if err != nil {
 		l.Error().Msg("Attestation failed. An unknown error occured. Please try again later.")
 	}

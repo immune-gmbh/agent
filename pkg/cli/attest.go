@@ -22,11 +22,7 @@ func (attest *attestCmd) Run(agentCore *core.AttestationClient) error {
 		return errors.New("no-state")
 	}
 
-	return doAttest(agentCore, ctx, attest.Dump, attest.DryRun)
-}
-
-func doAttest(agentCore *core.AttestationClient, ctx context.Context, dumpReportTo string, dryRun bool) error {
-	err := agentCore.Attest(ctx, dumpReportTo, dryRun)
+	err := agentCore.Attest(ctx, attest.Dump, attest.DryRun)
 	if err != nil {
 		core.LogAttestErrors(&log.Logger, err)
 		tui.SetUIState(tui.StAttestationFailed)

@@ -5,7 +5,6 @@ import (
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
-	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/rs/zerolog"
 )
 
@@ -22,7 +21,6 @@ type AttestationClient struct {
 	Client api.Client
 
 	// TPM
-	Anchor          tcg.TrustAnchor
 	EndorsementAuth string
 
 	// Logging

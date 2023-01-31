@@ -20,18 +20,18 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM 
 		ac.State.TPM = tpmPath
 	}
 
-	// open and close TPM on demand
-	if err := ac.OpenTPM(); err != nil {
-		// XXX return real error
-		ac.Log.Error().Msgf("Cannot open TPM: %s", ac.State.TPM)
+	a, err := tcg.OpenTPM(ac.State.TPM, ac.State.StubState)
+	if err != nil {
+		ac.Log.Debug().Err(err).Msg("tcg.OpenTPM(glob.State.TPM, glob.State.StubState)")
 
 		// don't show tpm step in tui when we don't use a tpm
 		if ac.State.TPM != state.DummyTPMIdentifier {
 			tui.SetUIState(tui.StSelectTAFailed)
 		}
-		return err
+
+		return ErrOpenTrustAnchor
 	}
-	// XXX close TPM here
+	defer a.Close()
 	tui.SetUIState(tui.StSelectTASuccess)
 
 	// when server override is set during enroll store it in state
@@ -42,16 +42,16 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM 
 
 	tui.SetUIState(tui.StCreateKeys)
 	ac.Log.Info().Msg("Creating Endorsement key")
-	ekHandle, ekPub, err := ac.Anchor.GetEndorsementKey()
+	ekHandle, ekPub, err := a.GetEndorsementKey()
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("tcg.GetEndorsementKey(glob.TpmConn)")
 		return ErrEndorsementKey
 	}
-	defer ekHandle.Flush(ac.Anchor)
+	defer ekHandle.Flush(a)
 	ac.State.EndorsementKey = api.PublicKey(ekPub)
 
 	ac.Log.Info().Msg("Reading Endorsement key certificate")
-	ekCert, err := ac.Anchor.ReadEKCertificate()
+	ekCert, err := a.ReadEKCertificate()
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("tcg.ReadEKCertificate(glob.TpmConn)")
 		ac.Log.Warn().Msg("No Endorsement key certificate in NVRAM")
@@ -62,12 +62,12 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM 
 	}
 
 	ac.Log.Info().Msg("Creating Root key")
-	rootHandle, rootPub, err := ac.Anchor.CreateAndLoadRoot(ac.EndorsementAuth, "", &ac.State.Config.Root.Public)
+	rootHandle, rootPub, err := a.CreateAndLoadRoot(ac.EndorsementAuth, "", &ac.State.Config.Root.Public)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("tcg.CreateAndLoadRoot(..)")
 		return ErrRootKey
 	}
-	defer rootHandle.Flush(ac.Anchor)
+	defer rootHandle.Flush(a)
 
 	rootName, err := api.ComputeName(rootPub)
 	if err != nil {
@@ -85,7 +85,7 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM 
 			ac.Log.Debug().Err(err).Msg("tcg.GenerateAuthValue()")
 			return ErrEnroll
 		}
-		key, priv, err := ac.Anchor.CreateAndCertifyDeviceKey(rootHandle, ac.State.Root.Auth, keyTmpl, keyAuth)
+		key, priv, err := a.CreateAndCertifyDeviceKey(rootHandle, ac.State.Root.Auth, keyTmpl, keyAuth)
 		if err != nil {
 			ac.Log.Debug().Err(err).Msgf("tcg.CreateAndCertifyDeviceKey(..): %s", keyName)
 			return ErrEnroll
@@ -152,14 +152,14 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM 
 			return ErrApiResponse
 		}
 
-		handle, err := ac.Anchor.LoadDeviceKey(rootHandle, ac.State.Root.Auth, key.Public, key.Private)
+		handle, err := a.LoadDeviceKey(rootHandle, ac.State.Root.Auth, key.Public, key.Private)
 		if err != nil {
 			ac.Log.Debug().Err(err).Msgf("tcg.LoadDeviceKey(..): %s", encCred.Name)
 			return ErrEnroll
 		}
 
-		cred, err := ac.Anchor.ActivateDeviceKey(*encCred, ac.EndorsementAuth, key.Auth, handle, ekHandle, ac.State)
-		handle.Flush(ac.Anchor)
+		cred, err := a.ActivateDeviceKey(*encCred, ac.EndorsementAuth, key.Auth, handle, ekHandle, ac.State)
+		handle.Flush(a)
 		if err != nil {
 			ac.Log.Debug().Err(err).Msgf("tcg.ActivateDeviceKey(..): %s", encCred.Name)
 			return ErrEnroll
@@ -183,7 +183,7 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM 
 	}
 
 	// incorporate dummy TPM state
-	if stub, ok := ac.Anchor.(*tcg.SoftwareAnchor); ok {
+	if stub, ok := a.(*tcg.SoftwareAnchor); ok {
 		if st, err := stub.Store(); err != nil {
 			ac.Log.Debug().Err(err).Msg("SoftwareAnchor.Store")
 			return ErrStateStore
