@@ -189,6 +189,6 @@ jobs:
         run: |
           cp ${PWD}/${REPOPATH_EDGE}/guard-1-${RELEASE_ID}-1.x86_64.rpm ${PWD}/${REPOPATH_PROD}
           createrepo_c --update ${PWD}/${REPOPATH_PROD}
-          gpg --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --detach-sign --armor ${PWD}/${REPOPATH_PROD}/repodata/repomd.xml
+          gpg --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --yes --detach-sign --armor ${PWD}/${REPOPATH_PROD}/repodata/repomd.xml
           sync
           umount live-repo
