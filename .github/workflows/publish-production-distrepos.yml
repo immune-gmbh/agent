@@ -4,7 +4,7 @@ on:
   pull_request: {}
 
 env:
-  AGENT_RELEASE_TAG: 'v3.8.8'
+  AGENT_RELEASE_TAG: 'v3.10.0'
 
 jobs:
   preflight:
