@@ -63,7 +63,7 @@ func TestToQuoteList(t *testing.T) {
 	agentCore.Log = &log.Logger
 
 	// sha1 only
-	agentCore.Anchor = testAnchor{
+	a := testAnchor{
 		Banks: map[string]map[string]api.Buffer{
 			"11": {},
 			"4": {
@@ -76,13 +76,13 @@ func TestToQuoteList(t *testing.T) {
 			},
 		},
 	}
-	toQuote, allPcr, err := agentCore.readAllPCRBanks(ctx)
+	toQuote, allPcr, err := agentCore.readAllPCRBanks(ctx, a)
 	assert.NoError(t, err)
 	assert.Equal(t, []int{0, 1, 2, 3, 4, 5}, toQuote)
 	assert.NotEmpty(t, allPcr)
 
 	// sha256 only
-	agentCore.Anchor = testAnchor{
+	a = testAnchor{
 		Banks: map[string]map[string]api.Buffer{
 			"11": {
 				"0": {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -95,13 +95,13 @@ func TestToQuoteList(t *testing.T) {
 			"4": {},
 		},
 	}
-	toQuote, allPcr, err = agentCore.readAllPCRBanks(ctx)
+	toQuote, allPcr, err = agentCore.readAllPCRBanks(ctx, a)
 	assert.NoError(t, err)
 	assert.Equal(t, []int{0, 1, 2, 3, 4, 5}, toQuote)
 	assert.NotEmpty(t, allPcr)
 
 	// sha1 & sha256
-	agentCore.Anchor = testAnchor{
+	a = testAnchor{
 		Banks: map[string]map[string]api.Buffer{
 			"11": {
 				"0": {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -121,13 +121,13 @@ func TestToQuoteList(t *testing.T) {
 			},
 		},
 	}
-	toQuote, allPcr, err = agentCore.readAllPCRBanks(ctx)
+	toQuote, allPcr, err = agentCore.readAllPCRBanks(ctx, a)
 	assert.NoError(t, err)
 	assert.Equal(t, []int{0, 1, 2, 3, 4, 5}, toQuote)
 	assert.NotEmpty(t, allPcr)
 
 	// subset sha1 & sha256
-	agentCore.Anchor = testAnchor{
+	a = testAnchor{
 		Banks: map[string]map[string]api.Buffer{
 			"11": {
 				"2": {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -143,7 +143,7 @@ func TestToQuoteList(t *testing.T) {
 			},
 		},
 	}
-	toQuote, allPcr, err = agentCore.readAllPCRBanks(ctx)
+	toQuote, allPcr, err = agentCore.readAllPCRBanks(ctx, a)
 	assert.NoError(t, err)
 	assert.Equal(t, []int{2, 3}, toQuote)
 	assert.NotEmpty(t, allPcr)

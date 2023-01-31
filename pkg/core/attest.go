@@ -21,9 +21,9 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 )
 
-func (ac *AttestationClient) readAllPCRBanks(ctx context.Context) ([]int, map[string]map[string]api.Buffer, error) {
+func (ac *AttestationClient) readAllPCRBanks(ctx context.Context, anchor tcg.TrustAnchor) ([]int, map[string]map[string]api.Buffer, error) {
 	// read all PCRs
-	allPCRs, err := ac.Anchor.AllPCRValues()
+	allPCRs, err := anchor.AllPCRValues()
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("tcg.AllPCRValues()")
 		return nil, nil, err
@@ -63,14 +63,16 @@ func (ac *AttestationClient) readAllPCRBanks(ctx context.Context) ([]int, map[st
 }
 
 func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, dryRun bool) error {
-	if err := ac.OpenTPM(); err != nil {
-		ac.Log.Error().Msgf("Cannot open TPM: %s", ac.State.TPM)
-		// XXX return proper error dont log here
-		return err
+	a, err := tcg.OpenTPM(ac.State.TPM, ac.State.StubState)
+	if err != nil {
+		ac.Log.Debug().Err(err).Msg("tcg.OpenTPM(ac.State.TPM, ac.State.StubState)")
+		return ErrOpenTrustAnchor
 	}
+	defer a.Close()
 
+	// if it is a real TPM get it's RWC for GatherFirmwareData
 	var conn io.ReadWriteCloser
-	if anch, ok := ac.Anchor.(*tcg.TCGAnchor); ok {
+	if anch, ok := a.(*tcg.TCGAnchor); ok {
 		conn = anch.Conn
 	}
 
@@ -93,7 +95,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	}
 	fwPropsHash := sha256.Sum256(fwPropsJCS)
 
-	toQuote, allPCRs, err := ac.readAllPCRBanks(ctx)
+	toQuote, allPCRs, err := ac.readAllPCRBanks(ctx, a)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("readAllPCRBanks()")
 		return ErrReadPcr
@@ -102,12 +104,12 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	// load Root key
 	tui.SetUIState(tui.StQuotePCR)
 	ac.Log.Info().Msg("Signing attestation data")
-	rootHandle, rootPub, err := ac.Anchor.CreateAndLoadRoot(ac.EndorsementAuth, ac.State.Root.Auth, &ac.State.Config.Root.Public)
+	rootHandle, rootPub, err := a.CreateAndLoadRoot(ac.EndorsementAuth, ac.State.Root.Auth, &ac.State.Config.Root.Public)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("tcg.CreateAndLoadRoot(..)")
 		return ErrRootKey
 	}
-	defer rootHandle.Flush(ac.Anchor)
+	defer rootHandle.Flush(a)
 
 	// make sure we're on the right TPM
 	rootName, err := api.ComputeName(rootPub)
@@ -126,13 +128,13 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	if !ok {
 		return ErrAik
 	}
-	aikHandle, err := ac.Anchor.LoadDeviceKey(rootHandle, ac.State.Root.Auth, aik.Public, aik.Private)
+	aikHandle, err := a.LoadDeviceKey(rootHandle, ac.State.Root.Auth, aik.Public, aik.Private)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("LoadDeviceKey(..)")
 		return ErrAik
 	}
-	defer aikHandle.Flush(ac.Anchor)
-	rootHandle.Flush(ac.Anchor)
+	defer aikHandle.Flush(a)
+	rootHandle.Flush(a)
 
 	// convert used PCR banks to tpm2.Algorithm selection for quote
 	var algs []tpm2.Algorithm
@@ -147,12 +149,12 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 
 	// generate quote
 	ac.Log.Trace().Msg("generate quote")
-	quote, sig, err := ac.Anchor.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuote)
+	quote, sig, err := a.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuote)
 	if err != nil || (sig.ECC == nil && sig.RSA == nil) {
 		ac.Log.Debug().Err(err).Msg("TPM2_Quote failed")
 		return ErrQuote
 	}
-	aikHandle.Flush(ac.Anchor)
+	aikHandle.Flush(a)
 
 	// fetch the runtime measurment log
 	//XXX 1) should only run on linux 2) must check errors 3) is placed here because fw report can't report data that should be omitted from quote and b/c this data is part of PCRs anyway

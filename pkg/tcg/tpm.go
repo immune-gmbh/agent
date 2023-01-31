@@ -326,6 +326,7 @@ func assertNotTPM1(conn io.ReadWriteCloser) error {
 	if err != nil {
 		_, err := tpm1.GetCapVersionVal(conn)
 		if err != nil {
+			// XXX this needs to become an error that is returned and can be mapped by attestation client
 			log.Error().Msg("Unsupported TPM version 1.2. Please contact us via sales@immu.ne.")
 			return errors.New("TPM1.2 is not supported")
 		}

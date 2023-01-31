@@ -11,7 +11,6 @@ import (
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
-	"github.com/immune-gmbh/agent/v3/pkg/tcg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -30,17 +29,6 @@ func NewCore() *AttestationClient {
 		ReleaseId:       &releaseId,
 		EndorsementAuth: defaultEndorsementAuth,
 	}
-}
-
-func (ac *AttestationClient) OpenTPM() error {
-	a, err := tcg.OpenTPM(ac.State.TPM, ac.State.StubState)
-	if err != nil {
-		ac.Log.Debug().Err(err).Msg("tcg.OpenTPM(glob.State.TPM, glob.State.StubState)")
-		return ErrOpenTrustAnchor
-	}
-
-	ac.Anchor = a
-	return nil
 }
 
 // load and migrate on-disk state

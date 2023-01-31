@@ -45,6 +45,8 @@ func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 			log.Error().Msg("Server resonse not understood. Is your agent up-to-date?")
 		} else if errors.Is(err, core.ErrStateStore) {
 			log.Error().Msg("Failed to store state.")
+		} else if errors.Is(err, core.ErrOpenTrustAnchor) {
+			log.Error().Msg("Cannot open TPM")
 		} else if err != nil {
 			log.Error().Msg("Enrollment failed. An unknown error occured. Please try again later.")
 		}
@@ -60,5 +62,12 @@ func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 		return nil
 	}
 
-	return doAttest(agentCore, ctx, "", false)
+	err := agentCore.Attest(ctx, "", false)
+	if err != nil {
+		core.LogAttestErrors(&log.Logger, err)
+		tui.SetUIState(tui.StAttestationFailed)
+		return err
+	}
+
+	return nil
 }
