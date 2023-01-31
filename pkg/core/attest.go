@@ -66,6 +66,15 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	a, err := tcg.OpenTPM(ac.State.TPM, ac.State.StubState)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("tcg.OpenTPM(ac.State.TPM, ac.State.StubState)")
+
+		// XXX we should properly map errors of supporting packages to attestation client error codes in the future
+		// XXX and we need more errors instead of just returning ErrOpenTrustAnchor; in tui mode the info message won't be visible
+		if errors.Is(err, tcg.ErrTpmV12Unsupported) {
+			ac.Log.Info().Msg("Unsupported TPM version 1.2. Please contact us via sales@immu.ne.")
+		} else if errors.Is(err, tcg.ErrTpmSelectionInvalid) {
+			ac.Log.Info().Msg("The TPM selection is invalid")
+		}
+
 		return ErrOpenTrustAnchor
 	}
 	defer a.Close()

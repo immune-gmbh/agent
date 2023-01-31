@@ -24,6 +24,14 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM 
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("tcg.OpenTPM(glob.State.TPM, glob.State.StubState)")
 
+		// XXX we should properly map errors of supporting packages to attestation client error codes in the future
+		// XXX and we need more errors instead of just returning ErrOpenTrustAnchor; in tui mode the info message won't be visible
+		if errors.Is(err, tcg.ErrTpmV12Unsupported) {
+			ac.Log.Info().Msg("Unsupported TPM version 1.2. Please contact us via sales@immu.ne.")
+		} else if errors.Is(err, tcg.ErrTpmSelectionInvalid) {
+			ac.Log.Info().Msg("The TPM selection is invalid")
+		}
+
 		// don't show tpm step in tui when we don't use a tpm
 		if ac.State.TPM != state.DummyTPMIdentifier {
 			tui.SetUIState(tui.StSelectTAFailed)
