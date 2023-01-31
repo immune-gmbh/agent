@@ -33,6 +33,11 @@ const (
 	maxTpmProperties    = ((maxCababilityBuffer - 8) / 8)
 )
 
+var (
+	ErrTpmV12Unsupported   = errors.New("TPM1.2 is not supported")
+	ErrTpmSelectionInvalid = errors.New("invalid TPM selection")
+)
+
 type TCGHandle struct {
 	Handle tpmutil.Handle
 }
@@ -50,7 +55,23 @@ func NewTCGAnchor(conn io.ReadWriteCloser) TrustAnchor {
 }
 
 func (a *TCGAnchor) FlushAllHandles() {
-	FlushTransientHandles(a.Conn)
+	vals, _, err := tpm2.GetCapability(a.Conn, tpm2.CapabilityHandles, 100, uint32(tpm2.HandleTypeTransient)<<24)
+	if err != nil {
+		log.Debug().Err(err).Msg("tpm2.GetCapability(..)")
+	}
+
+	if len(vals) > 0 {
+		log.Debug().Msgf("flushing %d transient objects off the TPM\n", len(vals))
+
+		for _, handle := range vals {
+			switch t := handle.(type) {
+			default:
+
+			case tpmutil.Handle:
+				tpm2.FlushContext(a.Conn, t)
+			}
+		}
+	}
 }
 
 func (a *TCGAnchor) Close() {
@@ -58,8 +79,6 @@ func (a *TCGAnchor) Close() {
 }
 
 func (a *TCGAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffer, banks []tpm2.Algorithm, pcrs []int) (api.Attest, api.Signature, error) {
-	log.Trace().Msg("tpm quote")
-
 	aikH := aikHandle.(*TCGHandle).Handle
 
 	// select the same PCRs in multiple banks
@@ -74,26 +93,20 @@ func (a *TCGAnchor) Quote(aikHandle Handle, aikAuth string, additional api.Buffe
 	// generate quote
 	attestBuf, sig, err := tpm2.Quote(a.Conn, aikH, aikAuth, "" /*unused*/, []byte(additional), pcrSel, tpm2.AlgNull)
 	if err != nil {
-		log.Debug().Err(err).Msg("TPM2_Quote failed")
-		log.Error().Msg("TPM 2.0 attestation failed")
-		return api.Attest{}, api.Signature{}, err
+		return api.Attest{}, api.Signature{}, fmt.Errorf("TPM2_Quote failed: %w", err)
 	}
 	aikHandle.Flush(a)
 
 	// fill evidence struct
 	attest, err := tpm2.DecodeAttestationData(attestBuf)
 	if err != nil {
-		log.Debug().Err(err).Msg("TPM2_Quote did not return a valid TPM2B_ATTEST")
-		log.Error().Msg("Failed to decode TPM response")
-		return api.Attest{}, api.Signature{}, err
+		return api.Attest{}, api.Signature{}, fmt.Errorf("TPM2_Quote did not return a valid TPM2B_ATTEST: %w", err)
 	}
 
 	return api.Attest(*attest), api.Signature(*sig), nil
 }
 
 func (a *TCGAnchor) PCRValues(bank tpm2.Algorithm, pcrsel []int) (map[string]api.Buffer, error) {
-	log.Trace().Msg("read PCRs")
-
 	// get available PCR banks and convert it to a map of PCRs per hash
 	tmp, err := CapabilityPCRs(a.Conn)
 	if err != nil {
@@ -135,8 +148,6 @@ func (a *TCGAnchor) PCRValues(bank tpm2.Algorithm, pcrsel []int) (map[string]api
 }
 
 func (a *TCGAnchor) AllPCRValues() (map[string]map[string]api.Buffer, error) {
-	log.Trace().Msg("read all PCRs")
-
 	availablePCRs, err := CapabilityPCRs(a.Conn)
 	if err != nil {
 		return nil, err
@@ -280,28 +291,6 @@ func openSgxTPM(url *url.URL) (io.ReadWriteCloser, error) {
 	return rwc, nil
 }
 
-func FlushTransientHandles(conn io.ReadWriteCloser) error {
-	vals, _, err := tpm2.GetCapability(conn, tpm2.CapabilityHandles, 100, uint32(tpm2.HandleTypeTransient)<<24)
-	if err != nil {
-		return err
-	}
-
-	if len(vals) > 0 {
-		log.Debug().Msgf("Flushing %d transient objects off the TPM\n", len(vals))
-
-		for _, handle := range vals {
-			switch t := handle.(type) {
-			default:
-
-			case tpmutil.Handle:
-				tpm2.FlushContext(conn, t)
-			}
-		}
-	}
-
-	return nil
-}
-
 func stubTPM(stubState *state.StubState) (anchor TrustAnchor, err error) {
 	if stubState != nil {
 		anchor, err = LoadSoftwareAnchor(stubState)
@@ -326,9 +315,8 @@ func assertNotTPM1(conn io.ReadWriteCloser) error {
 	if err != nil {
 		_, err := tpm1.GetCapVersionVal(conn)
 		if err != nil {
-			// XXX this needs to become an error that is returned and can be mapped by attestation client
-			log.Error().Msg("Unsupported TPM version 1.2. Please contact us via sales@immu.ne.")
-			return errors.New("TPM1.2 is not supported")
+			log.Debug().Msg("TPM1.2 detected")
+			return ErrTpmV12Unsupported
 		}
 	}
 
@@ -342,13 +330,16 @@ func OpenTPM(tpmPath string, stubState *state.StubState) (anchor TrustAnchor, er
 	switch tpmPath {
 	case "dummy":
 		anchor, err = stubTPM(stubState)
+		if err != nil {
+			err = fmt.Errorf("while opening stub TPM: %w", err)
+		}
 		return
 
 	case "system":
 		if runtime.GOOS == "windows" {
 			rwc, err = osOpenTPM("")
 		} else {
-			err = errors.New("invalid TPM selection")
+			err = ErrTpmSelectionInvalid
 		}
 
 	// decode URL schemes and VFS paths
@@ -367,7 +358,7 @@ func OpenTPM(tpmPath string, stubState *state.StubState) (anchor TrustAnchor, er
 			rwc, err = openNetTPM(u)
 		default:
 			if runtime.GOOS == "windows" {
-				err = errors.New("invalid TPM selection")
+				err = ErrTpmSelectionInvalid
 				break
 			}
 
