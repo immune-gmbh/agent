@@ -15,7 +15,6 @@ var (
 	ErrAik             = errors.New("create or load aik")
 	ErrQuote           = errors.New("tpm quote")
 	ErrUnknown         = errors.New("internal error")
-	ErrApiUrl          = errors.New("api url broken")
 	ErrEndorsementKey  = errors.New("create or load EK")
 	ErrEnroll          = errors.New("internal enrollment error")
 	ErrApiResponse     = errors.New("unexpected api response")
@@ -59,9 +58,7 @@ func LogAttestErrors(l *zerolog.Logger, err error) {
 
 // LogInitErrors is a helper function to translate errors to text and log them directly
 func LogInitErrors(l *zerolog.Logger, err error) {
-	if errors.Is(err, ErrApiUrl) {
-		l.Error().Msg("Invalid server URL.")
-	} else if errors.Is(err, ErrStateDir) {
+	if errors.Is(err, ErrStateDir) {
 		l.Error().Msg("Can't create or write state directory, check permissions")
 	} else if errors.Is(err, state.ErrNoPerm) {
 		l.Error().Msg("Cannot read state, no permissions.")

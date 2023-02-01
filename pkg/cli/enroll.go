@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"net/url"
 	"os"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
@@ -12,15 +13,29 @@ import (
 )
 
 type enrollCmd struct {
-	NoAttest bool   `help:"Don't attest after successful enrollment" default:"false"`
-	Token    string `arg:"" required:"" name:"token" help:"Enrollment authentication token"`
-	Name     string `arg:"" optional:"" name:"name hint" help:"Name to assign to the device. May get suffixed by a counter if already taken. Defaults to the hostname."`
-	TPM      string `name:"tpm" default:"${tpm_default_path}" help:"TPM device: device path (${tpm_default_path}) or mssim, sgx, swtpm/net url (mssim://localhost, sgx://localhost, net://localhost:1234) or 'dummy' for dummy TPM"`
-	DummyTPM bool   `name:"notpm" help:"Force using insecure dummy TPM if this device has no real TPM" default:"false"`
+	Server   *url.URL `name:"server" help:"immune SaaS API URL" type:"*url.URL"`
+	NoAttest bool     `help:"Don't attest after successful enrollment" default:"false"`
+	Token    string   `arg:"" required:"" name:"token" help:"Enrollment authentication token"`
+	Name     string   `arg:"" optional:"" name:"name hint" help:"Name to assign to the device. May get suffixed by a counter if already taken. Defaults to the hostname."`
+	TPM      string   `name:"tpm" default:"${tpm_default_path}" help:"TPM device: device path (${tpm_default_path}) or mssim, sgx, swtpm/net url (mssim://localhost, sgx://localhost, net://localhost:1234) or 'dummy' for dummy TPM"`
+	DummyTPM bool     `name:"notpm" help:"Force using insecure dummy TPM if this device has no real TPM" default:"false"`
 }
 
 func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 	ctx := context.Background()
+
+	// when server override is set during enroll store it in state
+	// so OS startup scripts can attest without needing to know the server URL
+	if enroll.Server != nil {
+		agentCore.OverrideServerUrl(enroll.Server)
+	}
+
+	// update config to get key templates for enrollment from server
+	if err := agentCore.UpdateConfig(); err != nil {
+		core.LogUpdateConfigErrors(&log.Logger, err)
+		tui.SetUIState(tui.StEnrollFailed)
+		return err
+	}
 
 	if err := agentCore.Enroll(ctx, enroll.Token, enroll.DummyTPM, enroll.TPM); err != nil {
 		if errors.Is(err, api.AuthError) {

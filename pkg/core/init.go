@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
+	"github.com/immune-gmbh/agent/v3/pkg/must"
 	"github.com/immune-gmbh/agent/v3/pkg/state"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -18,8 +18,8 @@ var (
 	releaseId string = "unknown"
 
 	// defaults
-	defaultServerURL       string = "https://api.immu.ne/v2"
-	defaultEndorsementAuth string = ""
+	defaultServerURL       *url.URL = must.Get(url.Parse("https://api.immu.ne/v2"))
+	defaultEndorsementAuth string   = ""
 )
 
 func NewCore() *AttestationClient {
@@ -79,29 +79,18 @@ func (ac *AttestationClient) initState(stateDir string) error {
 	return nil
 }
 
-func (ac *AttestationClient) initClient() error {
-	// use server URL in state, if any, with cmdline setting taking precedence
-	var srv *url.URL
-	if ac.Server != nil {
-		srv = ac.Server
-	} else if ac.State != nil && ac.State.ServerURL != nil {
-		srv = ac.State.ServerURL
+func (ac *AttestationClient) getServerUrl() *url.URL {
+	// use server URL in state, if any
+	if ac.State != nil && ac.State.ServerURL != nil {
+		return ac.State.ServerURL
 	} else {
-		var err error
-		srv, err = url.Parse(defaultServerURL)
-		if err != nil {
-			log.Debug().Msg("default server URL is invalid")
-			return ErrApiUrl
-		}
+		return defaultServerURL
 	}
-
-	ac.Client = api.NewClient(srv, nil, releaseId)
-	return nil
 }
 
 // try to get a new configuration from server
 func (ac *AttestationClient) UpdateConfig() error {
-	update, err := ac.State.EnsureFresh(&ac.Client)
+	update, err := ac.State.EnsureFresh(&ac.client)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("fetching fresh config")
 		return ErrUpdateConfig
@@ -119,21 +108,25 @@ func (ac *AttestationClient) UpdateConfig() error {
 	return nil
 }
 
-func (ac *AttestationClient) Init(stateDir string, server *url.URL, logger *zerolog.Logger) error {
-	// store server URL override
-	ac.Server = server
-
+func (ac *AttestationClient) Init(stateDir string, logger *zerolog.Logger) error {
 	// load on-disk state
 	if err := ac.initState(stateDir); err != nil {
 		return err
 	}
 
 	// init API client
-	if err := ac.initClient(); err != nil {
-		return err
-	}
+	ac.client = api.NewClient(ac.getServerUrl(), nil, releaseId)
 
 	ac.Log = logger
 
 	return nil
+}
+
+// OverrideServerUrl sets URL in state re-inits the API client
+// the changed URL becomes permanent when the state is stored, which happens during enroll and possibly when updating config
+func (ac *AttestationClient) OverrideServerUrl(server *url.URL) {
+	// store URL in state
+	ac.State.ServerURL = server
+	// re-init API client
+	ac.client = api.NewClient(ac.getServerUrl(), nil, releaseId)
 }

@@ -22,6 +22,13 @@ func (attest *attestCmd) Run(agentCore *core.AttestationClient) error {
 		return errors.New("no-state")
 	}
 
+	// update config after we have our state with a possibly non-default server URL
+	if err := agentCore.UpdateConfig(); err != nil {
+		core.LogUpdateConfigErrors(&log.Logger, err)
+		tui.SetUIState(tui.StAttestationFailed)
+		return err
+	}
+
 	err := agentCore.Attest(ctx, attest.Dump, attest.DryRun)
 	if err != nil {
 		core.LogAttestErrors(&log.Logger, err)
