@@ -21,7 +21,6 @@ var (
 	ErrApiResponse     = errors.New("unexpected api response")
 	ErrOpenTrustAnchor = errors.New("open trust anchor")
 	ErrStateDir        = errors.New("create or write state dir")
-	ErrCaFile          = errors.New("read or parse CA file")
 	ErrStateLoad       = errors.New("other state load error")
 	ErrStateStore      = errors.New("other state store error")
 	ErrUpdateConfig    = errors.New("fetch config from server")

@@ -1,8 +1,6 @@
 package core
 
 import (
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"net/url"
 	"os"
@@ -81,26 +79,7 @@ func (ac *AttestationClient) initState(stateDir string) error {
 	return nil
 }
 
-func (ac *AttestationClient) initClient(CA string) error {
-	var caCert *x509.Certificate
-	if CA != "" {
-		buf, err := os.ReadFile(CA)
-		if err != nil {
-			ac.Log.Debug().Err(err).Msgf("Cannot read: %s", CA)
-			return ErrCaFile
-		}
-
-		if pem, _ := pem.Decode(buf); pem != nil {
-			buf = pem.Bytes
-		}
-
-		caCert, err = x509.ParseCertificate(buf)
-		if err != nil {
-			ac.Log.Debug().Err(err).Msgf("CA certificate ill-formed")
-			return ErrCaFile
-		}
-	}
-
+func (ac *AttestationClient) initClient() error {
 	// use server URL in state, if any, with cmdline setting taking precedence
 	var srv *url.URL
 	if ac.Server != nil {
@@ -116,7 +95,7 @@ func (ac *AttestationClient) initClient(CA string) error {
 		}
 	}
 
-	ac.Client = api.NewClient(srv, caCert, releaseId)
+	ac.Client = api.NewClient(srv, nil, releaseId)
 	return nil
 }
 
@@ -140,7 +119,7 @@ func (ac *AttestationClient) UpdateConfig() error {
 	return nil
 }
 
-func (ac *AttestationClient) Init(stateDir, CA string, server *url.URL, logger *zerolog.Logger) error {
+func (ac *AttestationClient) Init(stateDir string, server *url.URL, logger *zerolog.Logger) error {
 	// store server URL override
 	ac.Server = server
 
@@ -150,7 +129,7 @@ func (ac *AttestationClient) Init(stateDir, CA string, server *url.URL, logger *
 	}
 
 	// init API client
-	if err := ac.initClient(CA); err != nil {
+	if err := ac.initClient(); err != nil {
 		return err
 	}
 
