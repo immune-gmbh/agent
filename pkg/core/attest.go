@@ -206,7 +206,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	// API call
 	tui.SetUIState(tui.StSendEvidence)
 	ac.Log.Info().Msg("Sending report to immune Guard cloud")
-	attestResponse, webLink, err := ac.Client.Attest(ctx, aik.Credential, evidence)
+	attestResponse, webLink, err := ac.client.Attest(ctx, aik.Credential, evidence)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("client.Attest(..)")
 

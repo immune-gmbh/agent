@@ -42,12 +42,6 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM 
 	defer a.Close()
 	tui.SetUIState(tui.StSelectTASuccess)
 
-	// when server override is set during enroll store it in state
-	// so OS startup scripts can attest without needing to know the server URL
-	if ac.Server != nil {
-		ac.State.ServerURL = ac.Server
-	}
-
 	tui.SetUIState(tui.StCreateKeys)
 	ac.Log.Info().Msg("Creating Endorsement key")
 	ekHandle, ekPub, err := a.GetEndorsementKey()
@@ -131,7 +125,7 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM 
 	}
 
 	tui.SetUIState(tui.StEnrollKeys)
-	enrollResp, err := ac.Client.Enroll(ctx, token, enrollReq)
+	enrollResp, err := ac.client.Enroll(ctx, token, enrollReq)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("client.Enroll(..)")
 
