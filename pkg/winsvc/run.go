@@ -136,7 +136,7 @@ func RunService() int {
 
 	// init agent core
 	agentCore := core.NewCore()
-	if err := agentCore.Init(state.DefaultStateDir(), "", nil, &log.Logger); err != nil {
+	if err := agentCore.Init(state.DefaultStateDir(), nil, &log.Logger); err != nil {
 		core.LogInitErrors(&log.Logger, err)
 		return 1
 	}

@@ -40,7 +40,6 @@ func (v traceFlag) BeforeApply() error {
 type rootCmd struct {
 	// Global options
 	Server   *url.URL    `name:"server" help:"immune SaaS API URL" type:"*url.URL"`
-	CA       string      `name:"server-ca" help:"immune SaaS API CA (PEM encoded)" type:"path"`
 	StateDir string      `name:"state-dir" default:"${state_default_dir}" help:"Directory holding the cli state" type:"path"`
 	LogFlag  bool        `name:"log" help:"Force log output on and text UI off"`
 	Verbose  verboseFlag `help:"Enable verbose mode, implies log"`
@@ -131,7 +130,7 @@ func RunCommandLineTool() int {
 	}
 
 	// init agent core
-	if err := agentCore.Init(cli.StateDir, cli.CA, cli.Server, &log.Logger); err != nil {
+	if err := agentCore.Init(cli.StateDir, cli.Server, &log.Logger); err != nil {
 		core.LogInitErrors(&log.Logger, err)
 		tui.DumpErr()
 		return 1
