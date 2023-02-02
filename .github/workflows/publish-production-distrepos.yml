@@ -50,10 +50,10 @@ jobs:
           sudo apt-get install -y s3fs gnupg-pkcs11-scd openvpn openvpn-systemd-resolved rpm createrepo-c
 
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         if: ${{ needs.preflight.outputs.doit == 'true' }}
         with:
-          go-version: '1.19'
+          go-version: '1.20'
 
       - name: Install aptly from source
         if: ${{ needs.preflight.outputs.doit == 'true' }}
