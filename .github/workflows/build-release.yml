@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       doit: ${{ steps.git-diff.outputs.diff != '' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) }}
+      really: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
     steps:
       - uses: actions/checkout@v3
         if: ${{ github.event_name != 'push' && !startsWith(github.ref, 'refs/tags/v') }}
@@ -199,7 +200,7 @@ jobs:
           rpm --addsign ./agent-binaries/*.rpm
 
       - uses: BetaHuhn/do-spaces-action@v2
-        if: ${{ needs.preflight.outputs.doit == 'true' && github.event_name == 'push' && startsWith(steps.locals.outputs.release_id, 'v') }}
+        if: ${{ needs.preflight.outputs.doit == 'true' && needs.preflight.outputs.really == 'true' && startsWith(steps.locals.outputs.release_id, 'v') }}
         with:
           access_key: ${{ secrets.DO_ACCESS_KEY}}
           secret_key: ${{ secrets.DO_SECRET_KEY }}
@@ -231,7 +232,7 @@ jobs:
             -o uid=$UID
 
       - name: Release packages to APT repo
-        if: ${{ needs.preflight.outputs.doit == 'true' && github.event_name == 'push' && startsWith(steps.locals.outputs.release_id, 'v') }}
+        if: ${{ needs.preflight.outputs.doit == 'true' && needs.preflight.outputs.really == 'true' && startsWith(steps.locals.outputs.release_id, 'v') }}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DO_ACCESS_KEY}}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_SECRET_KEY }}
@@ -263,7 +264,7 @@ jobs:
             -o uid=$UID
 
       - name: Release packages to RPM repo
-        if: ${{ needs.preflight.outputs.doit == 'true' && github.event_name == 'push' && startsWith(steps.locals.outputs.release_id, 'v') }}
+        if: ${{ needs.preflight.outputs.doit == 'true' && needs.preflight.outputs.really == 'true' && startsWith(steps.locals.outputs.release_id, 'v') }}
         shell: bash
         env:
           REPOPATH: live-repo/rpmrepo/edge
