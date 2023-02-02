@@ -1,6 +1,6 @@
 module github.com/immune-gmbh/agent/v3
 
-go 1.19
+go 1.20
 
 replace (
 	github.com/google/go-licenses => github.com/immune-gmbh/go-licenses v0.0.0-20220927112129-dc705f009100
