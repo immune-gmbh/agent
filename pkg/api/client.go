@@ -299,7 +299,7 @@ func (c *Client) doRequest(req *http.Request) (jsonapi.Payloader, error) {
 
 	var readBody bool
 	var retErr error
-	debugging := zerolog.GlobalLevel() == zerolog.TraceLevel
+	debugging := log.Logger.GetLevel() == zerolog.TraceLevel
 
 	switch {
 	// server tells us to use cached response and sends no body

@@ -24,15 +24,14 @@ const (
 type verboseFlag bool
 
 func (v verboseFlag) BeforeApply() error {
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	log.Logger = log.Level(zerolog.DebugLevel)
 	return nil
 }
 
 type traceFlag bool
 
 func (v traceFlag) BeforeApply() error {
-	zerolog.SetGlobalLevel(zerolog.TraceLevel)
-	log.Logger = log.Logger.With().Caller().Logger()
+	log.Logger = log.Logger.With().Caller().Logger().Level(zerolog.TraceLevel)
 	return nil
 }
 
@@ -87,8 +86,11 @@ func RunCommandLineTool() int {
 	// add info about build to description
 	desc := programDesc + " " + *agentCore.ReleaseId + " (" + runtime.GOARCH + ")"
 
-	// set default log level before kong possibly overrides it
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	// set global log level to trace so individual loggers can be set to all levels
+	zerolog.SetGlobalLevel(zerolog.TraceLevel)
+
+	// set default global logger log level before kong possibly overrides it
+	log.Logger = log.Level(zerolog.InfoLevel)
 
 	// Dynamically build Kong options
 	options := []kong.Option{
