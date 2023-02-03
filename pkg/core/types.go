@@ -15,7 +15,7 @@ type AttestationClient struct {
 	StatePath string
 
 	// API client
-	client api.Client
+	Client api.Client
 
 	// TPM
 	EndorsementAuth string
