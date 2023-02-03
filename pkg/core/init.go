@@ -90,7 +90,7 @@ func (ac *AttestationClient) getServerUrl() *url.URL {
 
 // try to get a new configuration from server
 func (ac *AttestationClient) UpdateConfig() error {
-	update, err := ac.State.EnsureFresh(&ac.client)
+	update, err := ac.State.EnsureFresh(&ac.Client)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("fetching fresh config")
 		return ErrUpdateConfig
@@ -115,7 +115,7 @@ func (ac *AttestationClient) Init(stateDir string, logger *zerolog.Logger) error
 	}
 
 	// init API client
-	ac.client = api.NewClient(ac.getServerUrl(), nil, releaseId)
+	ac.Client = api.NewClient(ac.getServerUrl(), nil, releaseId)
 
 	ac.Log = logger
 
@@ -128,5 +128,5 @@ func (ac *AttestationClient) OverrideServerUrl(server *url.URL) {
 	// store URL in state
 	ac.State.ServerURL = server
 	// re-init API client
-	ac.client = api.NewClient(ac.getServerUrl(), nil, releaseId)
+	ac.Client = api.NewClient(ac.getServerUrl(), nil, releaseId)
 }

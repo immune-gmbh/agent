@@ -125,7 +125,7 @@ func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM 
 	}
 
 	tui.SetUIState(tui.StEnrollKeys)
-	enrollResp, err := ac.client.Enroll(ctx, token, enrollReq)
+	enrollResp, err := ac.Client.Enroll(ctx, token, enrollReq)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("client.Enroll(..)")
 
