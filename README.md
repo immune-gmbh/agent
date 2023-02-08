@@ -87,4 +87,4 @@ Conclusion
 ----------
 Immune Guard is a powerful and comprehensive cyber security solution that helps to protect devices and systems from threats. Its combination of hardware and software technologies, along with ongoing support and maintenance, make it a reliable choice for organizations looking to improve their security posture.
 
-__Further information can be found at the [immune homepage](https://immu.ne/).__
+__Further information can be found at the [immune homepage](https://immune.gmbh/).__

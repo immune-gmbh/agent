@@ -56,7 +56,7 @@ func SetUIState(state UIState) {
 			showStepDone("Secure trust anchor found", true)
 		case StSelectTAFailed:
 			showStepDone("No secure trust anchor found", false)
-			printf("\nPlease check your BIOS/UEFI/BMC settings to enable a TPM if applicable.\nIn case your system has no TPM you can enable an insecure dummy TPM with the --notpm switch.\n\n    If you are unsure what to do, contact us via support@immu.ne.\n\n")
+			printf("\nPlease check your BIOS/UEFI/BMC settings to enable a TPM if applicable.\nIn case your system has no TPM you can enable an insecure dummy TPM with the --notpm switch.\n\n    If you are unsure what to do, contact us via support@immune.gmbh.\n\n")
 		case StCreateKeys:
 			showSpinner("Generate keys")
 		case StEnrollKeys:
