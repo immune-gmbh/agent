@@ -18,7 +18,7 @@ var (
 	releaseId string = "unknown"
 
 	// defaults
-	defaultServerURL       *url.URL = must.Get(url.Parse("https://api.immu.ne/v2"))
+	defaultServerURL       *url.URL = must.Get(url.Parse("https://api.immune.app/v2"))
 	defaultEndorsementAuth string   = ""
 )
 
