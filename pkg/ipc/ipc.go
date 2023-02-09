@@ -94,7 +94,9 @@ type SharedAgentResource struct {
 }
 
 func NewSharedAgent(agent *core.AttestationClient) *SharedAgentResource {
-	return &SharedAgentResource{agent: agent}
+	s := SharedAgentResource{agent: agent}
+	s.status.Enrolled = agent.State.IsEnrolled()
+	return &s
 }
 
 func (a *SharedAgentResource) tryLock() bool {
@@ -115,6 +117,7 @@ func (a *SharedAgentResource) unlock(newOp, newResult string) {
 	a.status.LastResult = newResult
 	now := time.Now()
 	a.status.LastRun = &now
+	a.status.Enrolled = a.agent.State.IsEnrolled()
 }
 
 // TryEnroll tries to get exclusive access to a shared agent to run the enroll operation
