@@ -8,6 +8,7 @@ replace (
 )
 
 require (
+	github.com/Microsoft/go-winio v0.6.0
 	github.com/alecthomas/kong v0.6.1
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/briandowns/spinner v1.19.0
