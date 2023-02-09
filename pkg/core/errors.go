@@ -51,6 +51,10 @@ func LogAttestErrors(l *zerolog.Logger, err error) {
 		l.Error().Msg("TPM 2.0 attestation failed.")
 	} else if errors.Is(err, ErrOpenTrustAnchor) {
 		l.Error().Msg("Cannot open TPM")
+	} else if errors.Is(err, ErrUpdateConfig) {
+		l.Error().Msg("Failed to load configuration from server")
+	} else if errors.Is(err, ErrStateStore) {
+		l.Error().Msg("Failed to store state.")
 	} else if err != nil {
 		l.Error().Msg("Attestation failed. An unknown error occured. Please try again later.")
 	}
@@ -68,16 +72,5 @@ func LogInitErrors(l *zerolog.Logger, err error) {
 		l.Error().Msg("Failed to store state.")
 	} else {
 		l.Error().Msg("Unknown error occured during initialization.")
-	}
-}
-
-// LogUpdateConfigErrors is a helper function to translate errors to text and log them directly
-func LogUpdateConfigErrors(l *zerolog.Logger, err error) {
-	if errors.Is(err, ErrUpdateConfig) {
-		l.Error().Msg("Failed to load configuration from server")
-	} else if errors.Is(err, ErrStateStore) {
-		l.Error().Msg("Failed to store state.")
-	} else {
-		l.Error().Msg("Unknown error occured during config update")
 	}
 }

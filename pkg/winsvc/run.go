@@ -89,13 +89,6 @@ loop:
 func (m *agentService) runAttest() time.Duration {
 	ctx := context.Background()
 
-	// try to update our config for each attest we do
-	// we could mostly encounter IO errors here but we should be able
-	// to run attest anyway, so we just let UpdateConfig log the error
-	if err := m.core.UpdateConfig(); err != nil {
-		core.LogUpdateConfigErrors(&log.Logger, err)
-	}
-
 	// run attest and retry with exponential backoff in case of error
 	if _, err := m.core.Attest(ctx, false); err != nil {
 		core.LogAttestErrors(&log.Logger, err)

@@ -30,13 +30,6 @@ func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 		agentCore.OverrideServerUrl(enroll.Server)
 	}
 
-	// update config to get key templates for enrollment from server
-	if err := agentCore.UpdateConfig(); err != nil {
-		core.LogUpdateConfigErrors(&log.Logger, err)
-		tui.SetUIState(tui.StEnrollFailed)
-		return err
-	}
-
 	if err := agentCore.Enroll(ctx, enroll.Token, enroll.DummyTPM, enroll.TPM); err != nil {
 		if errors.Is(err, api.AuthError) {
 			log.Error().Msg("Failed enrollment with an authentication error. Make sure the enrollment token is correct.")
@@ -62,6 +55,8 @@ func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 			log.Error().Msg("Failed to store state.")
 		} else if errors.Is(err, core.ErrOpenTrustAnchor) {
 			log.Error().Msg("Cannot open TPM")
+		} else if errors.Is(err, core.ErrUpdateConfig) {
+			log.Error().Msg("Failed to load configuration from server")
 		} else if err != nil {
 			log.Error().Msg("Enrollment failed. An unknown error occured. Please try again later.")
 		}

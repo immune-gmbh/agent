@@ -89,7 +89,7 @@ func (ac *AttestationClient) getServerUrl() *url.URL {
 }
 
 // try to get a new configuration from server
-func (ac *AttestationClient) UpdateConfig() error {
+func (ac *AttestationClient) updateConfig() error {
 	update, err := ac.State.EnsureFresh(&ac.Client)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("fetching fresh config")

@@ -61,6 +61,10 @@ func (ac *AttestationClient) readAllPCRBanks(ctx context.Context, anchor tcg.Tru
 }
 
 func (ac *AttestationClient) Attest(ctx context.Context, dryRun bool) (*api.Evidence, error) {
+	if err := ac.updateConfig(); err != nil {
+		return nil, err
+	}
+
 	a, err := tcg.OpenTPM(ac.State.TPM, ac.State.StubState)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("tcg.OpenTPM(ac.State.TPM, ac.State.StubState)")

@@ -13,6 +13,11 @@ import (
 )
 
 func (ac *AttestationClient) Enroll(ctx context.Context, token string, dummyTPM bool, tpmPath string) error {
+	// update config to get key templates for enrollment from server
+	if err := ac.updateConfig(); err != nil {
+		return err
+	}
+
 	// store used TPM in state, use dummy TPM only if forced
 	if dummyTPM {
 		ac.State.TPM = state.DummyTPMIdentifier
