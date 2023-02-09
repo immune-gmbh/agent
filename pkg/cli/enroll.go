@@ -3,34 +3,82 @@ package cli
 import (
 	"context"
 	"errors"
+	"io"
 	"net/url"
 	"os"
+	"runtime"
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/core"
+	"github.com/immune-gmbh/agent/v3/pkg/ipc"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
 	"github.com/rs/zerolog/log"
 )
 
 type enrollCmd struct {
-	Server   *url.URL `name:"server" help:"immune SaaS API URL" type:"*url.URL"`
-	NoAttest bool     `help:"Don't attest after successful enrollment" default:"false"`
-	Token    string   `arg:"" required:"" name:"token" help:"Enrollment authentication token"`
-	Name     string   `arg:"" optional:"" name:"name hint" help:"Name to assign to the device. May get suffixed by a counter if already taken. Defaults to the hostname."`
-	TPM      string   `name:"tpm" default:"${tpm_default_path}" help:"TPM device: device path (${tpm_default_path}) or mssim, sgx, swtpm/net url (mssim://localhost, sgx://localhost, net://localhost:1234) or 'dummy' for dummy TPM"`
-	DummyTPM bool     `name:"notpm" help:"Force using insecure dummy TPM if this device has no real TPM" default:"false"`
+	Server     *url.URL `name:"server" help:"immune SaaS API URL" type:"*url.URL"`
+	NoAttest   bool     `help:"Don't attest after successful enrollment" default:"false"`
+	Token      string   `arg:"" required:"" name:"token" help:"Enrollment authentication token"`
+	Name       string   `arg:"" optional:"" name:"name hint" help:"Name to assign to the device. May get suffixed by a counter if already taken. Defaults to the hostname."`
+	TPM        string   `name:"tpm" default:"${tpm_default_path}" help:"TPM device: device path (${tpm_default_path}) or mssim, sgx, swtpm/net url (mssim://localhost, sgx://localhost, net://localhost:1234) or 'dummy' for dummy TPM"`
+	DummyTPM   bool     `name:"notpm" help:"Force using insecure dummy TPM if this device has no real TPM" default:"false"`
+	Standalone bool     `help:"Don't connect to windows service to run enroll"`
 }
 
-func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
-	ctx := context.Background()
+func (enroll *enrollCmd) winSvcEnroll(ctx context.Context, stdLogOut io.Writer) error {
+	client, _, err := ipc.ConnectNamedPipe(ctx, stdLogOut)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to connect to server")
+		return err
+	}
+	defer client.Shutdown()
 
-	// when server override is set during enroll store it in state
-	// so OS startup scripts can attest without needing to know the server URL
-	if enroll.Server != nil {
-		agentCore.OverrideServerUrl(enroll.Server)
+	args := ipc.CmdArgsEnroll{Token: enroll.Token, DummyTPM: enroll.DummyTPM, TPMPath: enroll.TPM, Server: enroll.Server}
+	if reply, err := client.Enroll(args); err != nil {
+		log.Error().Err(err).Msg("failed to enroll on remote server")
+		return err
+	} else if len(reply.Status) > 0 {
+		// XXX this does not result in errors that compare well with errors.Is()
+		return errors.New(reply.Status)
 	}
 
-	if err := agentCore.Enroll(ctx, enroll.Token, enroll.DummyTPM, enroll.TPM); err != nil {
+	if enroll.NoAttest {
+		return nil
+	}
+
+	if reply, err := client.Attest(ipc.CmdArgsAttest{}); err != nil {
+		log.Error().Err(err).Msg("failed to attest on remote server")
+		return err
+	} else if len(reply.Status) > 0 {
+		// XXX this does not result in errors that compare well with errors.Is()
+		return errors.New(reply.Status)
+	}
+
+	// XXX check attest reply status code
+
+	return nil
+}
+
+func (enroll *enrollCmd) Run(agentCore *core.AttestationClient, stdLogOut *io.Writer) error {
+	ctx := context.Background()
+
+	runSvcClient := runtime.GOOS == "windows" && !enroll.Standalone
+
+	var err error
+	if runSvcClient {
+		err = enroll.winSvcEnroll(ctx, *stdLogOut)
+	} else {
+
+		// when server override is set during enroll store it in state
+		// so OS startup scripts can attest without needing to know the server URL
+		if enroll.Server != nil {
+			agentCore.OverrideServerUrl(enroll.Server)
+		}
+
+		err = agentCore.Enroll(ctx, enroll.Token, enroll.DummyTPM, enroll.TPM)
+	}
+
+	if err != nil {
 		if errors.Is(err, api.AuthError) {
 			log.Error().Msg("Failed enrollment with an authentication error. Make sure the enrollment token is correct.")
 		} else if errors.Is(err, api.FormatError) {
@@ -72,11 +120,13 @@ func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 		return nil
 	}
 
-	_, err := agentCore.Attest(ctx, false)
-	if err != nil {
-		core.LogAttestErrors(&log.Logger, err)
-		tui.SetUIState(tui.StAttestationFailed)
-		return err
+	if !runSvcClient {
+		_, err := agentCore.Attest(ctx, false)
+		if err != nil {
+			core.LogAttestErrors(&log.Logger, err)
+			tui.SetUIState(tui.StAttestationFailed)
+			return err
+		}
 	}
 
 	return nil

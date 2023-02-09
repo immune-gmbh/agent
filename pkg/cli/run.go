@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"io"
 	"os"
 	"runtime"
 
@@ -49,7 +50,7 @@ type rootCmd struct {
 	Collect collectCmd `cmd:"" help:"Only collect firmware data"`
 }
 
-func initUI(forceColors bool, forceLog bool) {
+func initUI(forceColors bool, forceLog bool) io.Writer {
 	notty := os.Getenv("TERM") == "dumb" || (!isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()))
 
 	// honor NO_COLOR env var as per https://no-color.org/ like the colors library we use does, too
@@ -78,6 +79,7 @@ func initUI(forceColors bool, forceLog bool) {
 
 	// apply settings to global default logger
 	log.Logger = log.Output(cw)
+	return cw
 }
 
 func RunCommandLineTool() int {
@@ -102,18 +104,26 @@ func RunCommandLineTool() int {
 			Summary: true,
 		}),
 		kong.Vars{
+			// setting the TPM default path here is incompatible with future cross-platform client/server agent connections
 			"tpm_default_path":  state.DefaultTPMDevice(),
 			"state_default_dir": state.DefaultStateDir(),
 		},
-		kong.Bind(&agentCore),
 	}
 	options = append(options, osSpecificCommands()...)
+
+	// hide --standalone when not on windows; only windows supports connecting to agent service
+	if runtime.GOOS != "windows" {
+		options = append(options, kong.IgnoreFields("Standalone"))
+	}
 
 	// Parse common cli options
 	var cli rootCmd
 	ctx := kong.Parse(&cli, options...)
 
-	initUI(cli.Colors, cli.LogFlag || bool(cli.Verbose) || bool(cli.Trace))
+	// init UI and determine a std log output for logging from remote agents
+	// when running as svc client we don't want tui b/c the tui states are not transmitted
+	runSvcClient := runtime.GOOS == "windows" && !cli.Attest.Standalone && !cli.Enroll.Standalone
+	stdLogOut := initUI(cli.Colors, cli.LogFlag || bool(cli.Verbose) || bool(cli.Trace) || runSvcClient)
 
 	// tell who we are
 	log.Debug().Msg(desc)
@@ -137,7 +147,7 @@ func RunCommandLineTool() int {
 	}
 
 	// Run the selected subcommand
-	if err := ctx.Run(agentCore); err != nil {
+	if err := ctx.Run(agentCore, &stdLogOut); err != nil {
 		tui.DumpErr()
 		return 1
 	} else {
