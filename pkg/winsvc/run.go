@@ -97,7 +97,7 @@ func (m *agentService) runAttest() time.Duration {
 	}
 
 	// run attest and retry with exponential backoff in case of error
-	if err := m.core.Attest(ctx, "", false); err != nil {
+	if _, err := m.core.Attest(ctx, false); err != nil {
 		core.LogAttestErrors(&log.Logger, err)
 		return m.backoff.Increase()
 	}
