@@ -77,7 +77,7 @@ func (enroll *enrollCmd) Run(agentCore *core.AttestationClient) error {
 		return nil
 	}
 
-	err := agentCore.Attest(ctx, "", false)
+	_, err := agentCore.Attest(ctx, false)
 	if err != nil {
 		core.LogAttestErrors(&log.Logger, err)
 		tui.SetUIState(tui.StAttestationFailed)

@@ -2,7 +2,10 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 
 	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
@@ -29,11 +32,30 @@ func (attest *attestCmd) Run(agentCore *core.AttestationClient) error {
 		return err
 	}
 
-	err := agentCore.Attest(ctx, attest.Dump, attest.DryRun)
+	evidence, err := agentCore.Attest(ctx, attest.DryRun)
 	if err != nil {
 		core.LogAttestErrors(&log.Logger, err)
 		tui.SetUIState(tui.StAttestationFailed)
 		return err
+	}
+
+	if attest.Dump != "" && evidence != nil {
+		evidenceJSON, err := json.Marshal(evidence)
+		if err != nil {
+			log.Debug().Err(err).Msg("json.Marshal(Evidence)")
+			log.Error().Msg("Failed to dump report.")
+			return err
+		}
+
+		if attest.Dump == "-" {
+			fmt.Println(string(evidenceJSON))
+		} else {
+			path := attest.Dump + ".evidence.json"
+			if err := os.WriteFile(path, evidenceJSON, 0644); err != nil {
+				return err
+			}
+			log.Info().Msgf("Dumped evidence json: %s", path)
+		}
 	}
 
 	return nil

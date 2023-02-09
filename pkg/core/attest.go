@@ -6,9 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"os"
 	"strconv"
 
 	"github.com/google/go-tpm/tpm2"
@@ -62,7 +60,7 @@ func (ac *AttestationClient) readAllPCRBanks(ctx context.Context, anchor tcg.Tru
 	return toQuoteInts, allPCRs, nil
 }
 
-func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, dryRun bool) error {
+func (ac *AttestationClient) Attest(ctx context.Context, dryRun bool) (*api.Evidence, error) {
 	a, err := tcg.OpenTPM(ac.State.TPM, ac.State.StubState)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("tcg.OpenTPM(ac.State.TPM, ac.State.StubState)")
@@ -75,7 +73,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 			ac.Log.Info().Msg("The TPM selection is invalid")
 		}
 
-		return ErrOpenTrustAnchor
+		return nil, ErrOpenTrustAnchor
 	}
 	defer a.Close()
 
@@ -95,19 +93,19 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	fwPropsJSON, err := json.Marshal(fwProps)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("json.Marshal(FirmwareProperties)")
-		return ErrEncodeJson
+		return nil, ErrEncodeJson
 	}
 	fwPropsJCS, err := jcs.Transform(fwPropsJSON)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("jcs.Transform(FirmwareProperties)")
-		return ErrEncodeJson
+		return nil, ErrEncodeJson
 	}
 	fwPropsHash := sha256.Sum256(fwPropsJCS)
 
 	toQuote, allPCRs, err := ac.readAllPCRBanks(ctx, a)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("readAllPCRBanks()")
-		return ErrReadPcr
+		return nil, ErrReadPcr
 	}
 
 	// load Root key
@@ -116,7 +114,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	rootHandle, rootPub, err := a.CreateAndLoadRoot(ac.EndorsementAuth, ac.State.Root.Auth, &ac.State.Config.Root.Public)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("tcg.CreateAndLoadRoot(..)")
-		return ErrRootKey
+		return nil, ErrRootKey
 	}
 	defer rootHandle.Flush(a)
 
@@ -124,23 +122,23 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	rootName, err := api.ComputeName(rootPub)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("Name(rootPub)")
-		return ErrRootKey
+		return nil, ErrRootKey
 	}
 
 	// check the root name. this will change if the endorsement proof value is changed
 	if !api.EqualNames(&rootName, &ac.State.Root.Name) {
-		return ErrRootKey
+		return nil, ErrRootKey
 	}
 
 	// load AIK
 	aik, ok := ac.State.Keys["aik"]
 	if !ok {
-		return ErrAik
+		return nil, ErrAik
 	}
 	aikHandle, err := a.LoadDeviceKey(rootHandle, ac.State.Root.Auth, aik.Public, aik.Private)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("LoadDeviceKey(..)")
-		return ErrAik
+		return nil, ErrAik
 	}
 	defer aikHandle.Flush(a)
 	rootHandle.Flush(a)
@@ -151,7 +149,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 		alg, err := strconv.ParseInt(k, 10, 16)
 		if err != nil {
 			ac.Log.Debug().Err(err).Msg("ParseInt failed")
-			return ErrQuote
+			return nil, ErrQuote
 		}
 		algs = append(algs, tpm2.Algorithm(alg))
 	}
@@ -161,7 +159,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 	quote, sig, err := a.Quote(aikHandle, aik.Auth, fwPropsHash[:], algs, toQuote)
 	if err != nil || (sig.ECC == nil && sig.RSA == nil) {
 		ac.Log.Debug().Err(err).Msg("TPM2_Quote failed")
-		return ErrQuote
+		return nil, ErrQuote
 	}
 	aikHandle.Flush(a)
 
@@ -182,25 +180,8 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 		Cookie:    cookie,
 	}
 
-	evidenceJSON, err := json.Marshal(evidence)
-	if err != nil {
-		ac.Log.Debug().Err(err).Msg("json.Marshal(Evidence)")
-		return ErrEncodeJson
-	}
-
-	// XXX this should be handled outside of attest
-	if dumpEvidenceTo == "-" {
-		fmt.Println(string(evidenceJSON))
-	} else if dumpEvidenceTo != "" {
-		path := dumpEvidenceTo + ".evidence.json"
-		if err := os.WriteFile(path, evidenceJSON, 0644); err != nil {
-			return err
-		}
-		ac.Log.Info().Msgf("Dumped evidence json: %s", path)
-	}
-
 	if dryRun {
-		return nil
+		return &evidence, nil
 	}
 
 	// API call
@@ -219,7 +200,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 			err = ErrUnknown
 		}
 
-		return err
+		return nil, err
 	}
 
 	// process response and update UI accordingly
@@ -231,7 +212,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 		if webLink != "" {
 			ac.Log.Info().Msgf("See detailed results here: %s", webLink)
 		}
-		return nil
+		return &evidence, nil
 	} else {
 		tui.SetUIState(tui.StAttestationSuccess)
 		ac.Log.Info().Msg("Attestation successful")
@@ -275,5 +256,5 @@ func (ac *AttestationClient) Attest(ctx context.Context, dumpEvidenceTo string, 
 		ac.Log.Debug().Msg(string(appraisal))
 	}
 
-	return nil
+	return &evidence, nil
 }
