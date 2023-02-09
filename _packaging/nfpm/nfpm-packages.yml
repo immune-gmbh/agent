@@ -8,7 +8,7 @@ version: "1-${RELEASE_ID}"
 version_schema: "none"
 section: "default"
 priority: "extra"
-maintainer: "Kai Michaelis <kai.michaelis@immu.ne>"
+maintainer: "Kai Michaelis <kai.michaelis@immune.gmbh>"
 description: |
   Remote attestation and firmware security monitoring for servers.
 vendor: "immune GmbH"
