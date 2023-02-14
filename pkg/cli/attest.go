@@ -34,8 +34,7 @@ func (attest *attestCmd) winSvcAttest(ctx context.Context, stdLogOut io.Writer) 
 		log.Error().Err(err).Msg("failed to attest on remote server")
 		return err
 	} else if len(reply.Status) > 0 {
-		// XXX this does not result in errors that compare well with errors.Is()
-		return errors.New(reply.Status)
+		return core.AttestationClientError(reply.Status)
 	}
 
 	return nil
