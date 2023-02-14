@@ -2,13 +2,11 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/url"
 	"os"
 	"runtime"
 
-	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/core"
 	"github.com/immune-gmbh/agent/v3/pkg/ipc"
 	"github.com/immune-gmbh/agent/v3/pkg/tui"
@@ -25,50 +23,29 @@ type enrollCmd struct {
 	Standalone bool     `help:"Don't connect to windows service to run enroll"`
 }
 
-func (enroll *enrollCmd) winSvcEnroll(ctx context.Context, stdLogOut io.Writer) error {
-	client, _, err := ipc.ConnectNamedPipe(ctx, stdLogOut)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to connect to server")
-		return err
-	}
-	defer client.Shutdown()
-
-	args := ipc.CmdArgsEnroll{Token: enroll.Token, DummyTPM: enroll.DummyTPM, TPMPath: enroll.TPM, Server: enroll.Server}
-	if reply, err := client.Enroll(args); err != nil {
-		log.Error().Err(err).Msg("failed to enroll on remote server")
-		return err
-	} else if len(reply.Status) > 0 {
-		// XXX this does not result in errors that compare well with errors.Is()
-		return errors.New(reply.Status)
-	}
-
-	if enroll.NoAttest {
-		return nil
-	}
-
-	if reply, err := client.Attest(ipc.CmdArgsAttest{}); err != nil {
-		log.Error().Err(err).Msg("failed to attest on remote server")
-		return err
-	} else if len(reply.Status) > 0 {
-		// XXX this does not result in errors that compare well with errors.Is()
-		return errors.New(reply.Status)
-	}
-
-	// XXX check attest reply status code
-
-	return nil
-}
-
 func (enroll *enrollCmd) Run(agentCore *core.AttestationClient, stdLogOut *io.Writer) error {
 	ctx := context.Background()
 
 	runSvcClient := runtime.GOOS == "windows" && !enroll.Standalone
 
 	var err error
+	var client *ipc.Client
 	if runSvcClient {
-		err = enroll.winSvcEnroll(ctx, *stdLogOut)
-	} else {
+		client, _, err = ipc.ConnectNamedPipe(ctx, *stdLogOut)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to connect to server")
+			return err
+		}
+		defer client.Shutdown()
 
+		args := ipc.CmdArgsEnroll{Token: enroll.Token, DummyTPM: enroll.DummyTPM, TPMPath: enroll.TPM, Server: enroll.Server}
+		var reply *ipc.CmdArgsEnrollReply
+		if reply, err = client.Enroll(args); err != nil {
+			log.Error().Err(err).Msg("failed to enroll on remote server")
+		} else if len(reply.Status) > 0 {
+			err = core.AttestationClientError(reply.Status)
+		}
+	} else {
 		// when server override is set during enroll store it in state
 		// so OS startup scripts can attest without needing to know the server URL
 		if enroll.Server != nil {
@@ -79,36 +56,7 @@ func (enroll *enrollCmd) Run(agentCore *core.AttestationClient, stdLogOut *io.Wr
 	}
 
 	if err != nil {
-		if errors.Is(err, api.AuthError) {
-			log.Error().Msg("Failed enrollment with an authentication error. Make sure the enrollment token is correct.")
-		} else if errors.Is(err, api.FormatError) {
-			log.Error().Msg("Enrollment failed. The server rejected our request. Make sure the agent is up to date.")
-		} else if errors.Is(err, api.NetworkError) {
-			log.Error().Msg("Enrollment failed. Cannot contact the immune Guard server. Make sure you're connected to the internet.")
-		} else if errors.Is(err, api.ServerError) {
-			log.Error().Msg("Enrollment failed. The immune Guard server failed to process the request. Please try again later.")
-		} else if errors.Is(err, api.PaymentError) {
-			log.Error().Msg("Enrollment failed. A payment is required for further enrollments.")
-		} else if errors.Is(err, core.ErrRootKey) {
-			log.Error().Msg("Failed to create or load root key.")
-		} else if errors.Is(err, core.ErrAik) {
-			log.Error().Msg("Server refused to certify attestation key.")
-		} else if errors.Is(err, core.ErrEndorsementKey) {
-			log.Error().Msg("Cannot create Endorsement key.")
-		} else if errors.Is(err, core.ErrEnroll) {
-			log.Error().Msg("Internal error during enrollment.")
-		} else if errors.Is(err, core.ErrApiResponse) {
-			log.Error().Msg("Server resonse not understood. Is your agent up-to-date?")
-		} else if errors.Is(err, core.ErrStateStore) {
-			log.Error().Msg("Failed to store state.")
-		} else if errors.Is(err, core.ErrOpenTrustAnchor) {
-			log.Error().Msg("Cannot open TPM")
-		} else if errors.Is(err, core.ErrUpdateConfig) {
-			log.Error().Msg("Failed to load configuration from server")
-		} else if err != nil {
-			log.Error().Msg("Enrollment failed. An unknown error occured. Please try again later.")
-		}
-
+		core.LogEnrollErrors(&log.Logger, err)
 		tui.SetUIState(tui.StEnrollFailed)
 		return err
 	}
@@ -120,13 +68,21 @@ func (enroll *enrollCmd) Run(agentCore *core.AttestationClient, stdLogOut *io.Wr
 		return nil
 	}
 
-	if !runSvcClient {
-		_, err := agentCore.Attest(ctx, false)
-		if err != nil {
-			core.LogAttestErrors(&log.Logger, err)
-			tui.SetUIState(tui.StAttestationFailed)
-			return err
+	if runSvcClient {
+		var reply *ipc.CmdArgsAttestReply
+		if reply, err = client.Attest(ipc.CmdArgsAttest{}); err != nil {
+			log.Error().Err(err).Msg("failed to attest on remote server")
+		} else if len(reply.Status) > 0 {
+			err = core.AttestationClientError(reply.Status)
 		}
+	} else {
+		_, err = agentCore.Attest(ctx, false)
+	}
+
+	if err != nil {
+		core.LogAttestErrors(&log.Logger, err)
+		tui.SetUIState(tui.StAttestationFailed)
+		return err
 	}
 
 	return nil

@@ -8,24 +8,66 @@ import (
 	"github.com/rs/zerolog"
 )
 
+type AttestationClientError string
+
+func (e AttestationClientError) Error() string {
+	return string(e)
+}
+
+func (e AttestationClientError) Is(target error) bool {
+	// this is a bit hacky but will also work for api package errors f.e.
+	return string(e) == target.Error()
+}
+
 var (
-	ErrEncodeJson      = errors.New("json encoding")
-	ErrReadPcr         = errors.New("read pcr")
-	ErrRootKey         = errors.New("create or load root key")
-	ErrAik             = errors.New("create or load aik")
-	ErrQuote           = errors.New("tpm quote")
-	ErrUnknown         = errors.New("internal error")
-	ErrEndorsementKey  = errors.New("create or load EK")
-	ErrEnroll          = errors.New("internal enrollment error")
-	ErrApiResponse     = errors.New("unexpected api response")
-	ErrOpenTrustAnchor = errors.New("open trust anchor")
-	ErrStateDir        = errors.New("create or write state dir")
-	ErrStateLoad       = errors.New("other state load error")
-	ErrStateStore      = errors.New("other state store error")
-	ErrUpdateConfig    = errors.New("fetch config from server")
+	ErrEncodeJson      = AttestationClientError("json encoding")
+	ErrReadPcr         = AttestationClientError("read pcr")
+	ErrRootKey         = AttestationClientError("create or load root key")
+	ErrAik             = AttestationClientError("create or load aik")
+	ErrQuote           = AttestationClientError("tpm quote")
+	ErrUnknown         = AttestationClientError("internal error")
+	ErrEndorsementKey  = AttestationClientError("create or load EK")
+	ErrEnroll          = AttestationClientError("internal enrollment error")
+	ErrApiResponse     = AttestationClientError("unexpected api response")
+	ErrOpenTrustAnchor = AttestationClientError("open trust anchor")
+	ErrStateDir        = AttestationClientError("create or write state dir")
+	ErrStateLoad       = AttestationClientError("other state load error")
+	ErrStateStore      = AttestationClientError("other state store error")
+	ErrUpdateConfig    = AttestationClientError("fetch config from server")
 )
 
-// XXX these log functions are more part of tui package
+// LogEnrollErrors is a helper function to translate errors to text and log them directly
+func LogEnrollErrors(l *zerolog.Logger, err error) {
+	if errors.Is(err, api.AuthError) {
+		l.Error().Msg("Failed enrollment with an authentication error. Make sure the enrollment token is correct.")
+	} else if errors.Is(err, api.FormatError) {
+		l.Error().Msg("Enrollment failed. The server rejected our request. Make sure the agent is up to date.")
+	} else if errors.Is(err, api.NetworkError) {
+		l.Error().Msg("Enrollment failed. Cannot contact the immune Guard server. Make sure you're connected to the internet.")
+	} else if errors.Is(err, api.ServerError) {
+		l.Error().Msg("Enrollment failed. The immune Guard server failed to process the request. Please try again later.")
+	} else if errors.Is(err, api.PaymentError) {
+		l.Error().Msg("Enrollment failed. A payment is required for further enrollments.")
+	} else if errors.Is(err, ErrRootKey) {
+		l.Error().Msg("Failed to create or load root key.")
+	} else if errors.Is(err, ErrAik) {
+		l.Error().Msg("Server refused to certify attestation key.")
+	} else if errors.Is(err, ErrEndorsementKey) {
+		l.Error().Msg("Cannot create Endorsement key.")
+	} else if errors.Is(err, ErrEnroll) {
+		l.Error().Msg("Internal error during enrollment.")
+	} else if errors.Is(err, ErrApiResponse) {
+		l.Error().Msg("Server resonse not understood. Is your agent up-to-date?")
+	} else if errors.Is(err, ErrStateStore) {
+		l.Error().Msg("Failed to store state.")
+	} else if errors.Is(err, ErrOpenTrustAnchor) {
+		l.Error().Msg("Cannot open TPM")
+	} else if errors.Is(err, ErrUpdateConfig) {
+		l.Error().Msg("Failed to load configuration from server")
+	} else {
+		l.Error().Msg("Enrollment failed. An unknown error occured. Please try again later.")
+	}
+}
 
 // LogAttestErrors is a helper function to translate errors to text and log them directly
 func LogAttestErrors(l *zerolog.Logger, err error) {
