@@ -14,10 +14,12 @@ type cmdWinSvc struct {
 	Remove  cmdWinSvcRemove  `cmd:"" help:"Remove agent service"`
 }
 
-type cmdWinSvcInstall struct{}
+type cmdWinSvcInstall struct {
+	Force bool `help:"Install service even if it is already installed" default:"false"`
+}
 
 func (c *cmdWinSvcInstall) Run(glob *core.AttestationClient) error {
-	err := winsvc.Install(winsvc.SVC_NAME, winsvc.SVC_DESC)
+	err := winsvc.Install(winsvc.SVC_NAME, winsvc.SVC_DESC, c.Force)
 	if err != nil {
 		log.Error().Msgf("failed to install service: %v", err)
 		return err
