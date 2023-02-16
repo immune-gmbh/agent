@@ -109,6 +109,8 @@ func (ac *AttestationClient) updateConfig() error {
 }
 
 func (ac *AttestationClient) Init(stateDir string, logger *zerolog.Logger) error {
+	ac.Log = logger
+
 	// load on-disk state
 	if err := ac.initState(stateDir); err != nil {
 		return err
@@ -116,8 +118,6 @@ func (ac *AttestationClient) Init(stateDir string, logger *zerolog.Logger) error
 
 	// init API client
 	ac.Client = api.NewClient(ac.getServerUrl(), nil, releaseId)
-
-	ac.Log = logger
 
 	return nil
 }
