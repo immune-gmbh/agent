@@ -60,8 +60,6 @@ func Install(name, desc string, force bool) error {
 				if err != nil {
 					return err
 				}
-				// really ignore this error; if we have a problem here, then it will show anyway when creating the eventlog below
-				eventlog.Remove(name)
 				return nil
 			}()
 			if err != nil {
@@ -77,6 +75,11 @@ func Install(name, desc string, force bool) error {
 		return err
 	}
 	defer s.Close()
+
+	// make sure we can always install and ignore this error
+	// if we have a problem here, then it will show anyway when creating the eventlog below
+	eventlog.Remove(name)
+
 	err = eventlog.InstallAsEventCreate(name, eventlog.Error|eventlog.Warning|eventlog.Info)
 	if err != nil {
 		s.Delete()
