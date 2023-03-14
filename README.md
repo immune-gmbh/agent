@@ -6,7 +6,7 @@ It used together with the immune Guard Platform.
 
 How to build
 ------------
-The service is written on Go and needs version 1.19 or later to be built.
+The service is written on Go and needs version 1.20 or later to be built.
 
 You need to have git lfs installed for windows builds. Install with "git lfs install"
 and run "git lfs pull" once and in future the next regular fetch and pull will do it.
