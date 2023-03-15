@@ -70,6 +70,12 @@ type FirmwareProperties struct {
 	Devices         *Devices           `json:"devices,omitempty"`
 	IMALog          *ErrorBuffer       `json:"ima_log,omitempty"`
 	EPPInfo         *EPPInfo           `json:"epp_info,omitempty"`
+	BootApps        *BootApps          `json:"boot_apps,omitempty"`
+}
+
+type BootApps struct {
+	Images    map[string]HashBlob `json:"images,omitempty"` // path -> pe file
+	ImagesErr FirmwareError       `json:"images_err,omitempty"`
 }
 
 type EPPInfo struct {
