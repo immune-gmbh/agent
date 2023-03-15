@@ -7,16 +7,22 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"path"
+	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/google/jsonapi"
+	"github.com/immune-gmbh/agent/v3/pkg/typevisit"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -35,6 +41,17 @@ var (
 func errIsClientSide(err error) bool {
 	// client side errors do not retry requests
 	return errors.Is(err, FormatError) || errors.Is(err, AuthError) || errors.Is(err, PaymentError)
+}
+
+var blobStoreVisitor *typevisit.TypeVisitorTree
+
+func init() {
+	// construct a type visitor tree for re-use
+	tvt, err := typevisit.New(&FirmwareProperties{}, HashBlob{}, "")
+	if err != nil {
+		panic(err)
+	}
+	blobStoreVisitor = tvt
 }
 
 func Cookie(rng io.Reader) (string, error) {
@@ -93,7 +110,7 @@ func (c *Client) Enroll(ctx context.Context, enrollToken string, enroll Enrollme
 	doc.Data.Type = "enrollment"
 
 	// decode credentials
-	payload, err := c.Post(ctx, "enroll", doc)
+	payload, err := c.Post(ctx, "enroll", doc, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +133,37 @@ func (c *Client) Enroll(ctx context.Context, enrollToken string, enroll Enrollme
 	return creds, err
 }
 
-func (c *Client) Attest(ctx context.Context, quoteCredential string, ev Evidence) (*Appraisal, string, error) {
+func handleHashBlob(blobs map[string][]byte, blob *HashBlob) {
+	if len(blob.ZData) > 0 && len(blob.Sha256) == 32 {
+		blobs[hex.EncodeToString(blob.Sha256)] = blob.ZData
+		blob.ZData = nil
+	}
+}
+
+// StripEvidenceHashBlobs strips all hash blobs from the given firmware properties only leaving their hashes; the blobs can then be transmitted out-of-band
+func StripFirmwarePropertiesHashBlobs(fw *FirmwareProperties) map[string][]byte {
+	blobs := make(map[string][]byte)
+	blobStoreVisitor.Visit(fw, func(v reflect.Value, opts typevisit.FieldOpts) {
+		// we need a special treatment for maps because there are no pointers to map elements
+		if v.Kind() == reflect.Map {
+			mi := v.MapRange()
+			for mi.Next() {
+				hb := mi.Value().Interface().(HashBlob)
+				handleHashBlob(blobs, &hb)
+				v.SetMapIndex(mi.Key(), reflect.ValueOf(hb))
+			}
+		} else {
+			hb := v.Addr().Interface().(*HashBlob)
+			handleHashBlob(blobs, hb)
+		}
+	})
+	if len(blobs) == 0 {
+		return nil
+	}
+	return blobs
+}
+
+func (c *Client) Attest(ctx context.Context, quoteCredential string, ev Evidence, multiPartFiles map[string][]byte) (*Appraisal, string, error) {
 	log.Trace().Msg("attesting to SaaS")
 	c.Auth = quoteCredential
 
@@ -130,7 +177,7 @@ func (c *Client) Attest(ctx context.Context, quoteCredential string, ev Evidence
 	}
 	doc.Data.Type = "evidence"
 
-	payload, err := c.Post(ctx, "attest", doc)
+	payload, err := c.Post(ctx, "attest", doc, multiPartFiles)
 	if err != nil {
 		return nil, "", err
 	}
@@ -195,7 +242,7 @@ func (c *Client) Configuration(ctx context.Context, lastUpdate *time.Time) (*Con
 	return &cfg, err
 }
 
-func (c *Client) Post(ctx context.Context, route string, doc interface{}) (jsonapi.Payloader, error) {
+func (c *Client) Post(ctx context.Context, route string, doc interface{}, multiPartFiles map[string][]byte) (jsonapi.Payloader, error) {
 	var err error
 	var ev jsonapi.Payloader
 
@@ -205,7 +252,7 @@ func (c *Client) Post(ctx context.Context, route string, doc interface{}) (jsona
 		}
 		ctx, cancel := context.WithTimeout(ctx, c.PostRequestTimeout)
 		defer cancel()
-		ev, err = c.doPost(ctx, route, doc)
+		ev, err = c.doPost(ctx, route, doc, multiPartFiles)
 
 		if err == nil || errIsClientSide(err) {
 			return ev, err
@@ -236,25 +283,63 @@ func (c *Client) Get(ctx context.Context, route string, ifModifiedSince *time.Ti
 	return ev, err
 }
 
-func (c *Client) doPost(ctx context.Context, route string, doc interface{}) (jsonapi.Payloader, error) {
+func (c *Client) doPost(ctx context.Context, route string, doc interface{}, multiPartFiles map[string][]byte) (jsonapi.Payloader, error) {
 	endpoint := *c.Base
 	endpoint.Path = path.Join(endpoint.Path, route)
 
 	pipe := new(bytes.Buffer)
 	gz := gzip.NewWriter(pipe)
-	err := json.NewEncoder(gz).Encode(doc)
+	var err error
+	var writer *multipart.Writer
+	if len(multiPartFiles) > 0 {
+		writer = multipart.NewWriter(gz)
+
+		h := make(textproto.MIMEHeader)
+		h.Set("Content-Disposition", `form-data; name="evidencebody"; filename="evidencebody"`)
+		h.Set("Content-Type", "application/json")
+		part, err := writer.CreatePart(h)
+		if err != nil {
+			return nil, FormatError
+		}
+		err = json.NewEncoder(part).Encode(doc)
+		if err != nil {
+			return nil, FormatError
+		}
+
+		// encode multipart files
+		i := 0
+		for k, v := range multiPartFiles {
+			iow, err := writer.CreateFormFile(strconv.Itoa(i), k)
+			if err != nil {
+				return nil, err
+			}
+			_, err = io.Copy(iow, bytes.NewReader(v))
+			if err != nil {
+				return nil, err
+			}
+			i++
+		}
+
+		writer.Close()
+	} else {
+		err = json.NewEncoder(gz).Encode(doc)
+		if err != nil {
+			return nil, FormatError
+		}
+	}
 	gz.Flush()
 
-	if err != nil {
-		return nil, FormatError
-	}
 	log.Debug().Msgf("POST %s", endpoint.String())
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), pipe)
 	if err != nil {
 		return nil, FormatError
 	}
-	req.Header.Add("Content-Type", "application/json")
+	if len(multiPartFiles) > 0 {
+		req.Header.Add("Content-Type", writer.FormDataContentType())
+	} else {
+		req.Header.Add("Content-Type", "application/json")
+	}
 	req.Header.Add("Content-Encoding", "gzip")
 
 	return c.doRequest(req)
