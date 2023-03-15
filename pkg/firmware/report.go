@@ -11,6 +11,7 @@ import (
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/acpi"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/biosflash"
+	"github.com/immune-gmbh/agent/v3/pkg/firmware/bootapps"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/cpuid"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/epp"
@@ -164,6 +165,10 @@ func GatherFirmwareData(tpmConn io.ReadWriteCloser, request *api.Configuration) 
 			fwData.Devices = nil
 		}
 	}
+
+	// UEFI Booot Applications
+	fwData.BootApps = &api.BootApps{}
+	bootapps.ReportBootApps(fwData.BootApps)
 
 	log.Trace().Msg("done gathering report data")
 	return fwData
