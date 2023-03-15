@@ -334,7 +334,7 @@ func (pub *PublicKey) Scan(src interface{}) error {
 	case []byte:
 		buf = src.([]byte)
 	default:
-		return errors.New("Incompatible type for api.Name")
+		return errors.New("incompatible type for api.Name")
 	}
 	newpub, err := tpm2.DecodePublic(buf)
 	if err == nil {

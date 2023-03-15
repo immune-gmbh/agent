@@ -62,7 +62,7 @@ func TestClient_Configuration(t *testing.T) {
 		assert.NotNil(t, modSinceHeader)
 		tm, err := time.Parse(tf, modSinceHeader)
 		assert.NoError(t, err)
-		tm.Equal(modifiedSince)
+		assert.True(t, tm.Equal(modifiedSince))
 
 		assert.Equal(t, req.URL.String(), targetURL.String())
 		return &http.Response{
