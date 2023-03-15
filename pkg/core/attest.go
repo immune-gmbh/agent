@@ -169,6 +169,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dryRun bool) (*api.Evid
 
 	// fetch the runtime measurment log
 	//XXX 1) should only run on linux 2) must check errors 3) is placed here because fw report can't report data that should be omitted from quote and b/c this data is part of PCRs anyway
+	//TODO: check if this can be fixed using the new blob out of band transfer mechanism
 	fwProps.IMALog = new(api.ErrorBuffer)
 	ima.ReportIMALog(fwProps.IMALog)
 
@@ -191,7 +192,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dryRun bool) (*api.Evid
 	// API call
 	tui.SetUIState(tui.StSendEvidence)
 	ac.Log.Info().Msg("Sending report to immune Guard cloud")
-	attestResponse, webLink, err := ac.Client.Attest(ctx, aik.Credential, evidence)
+	attestResponse, webLink, err := ac.Client.Attest(ctx, aik.Credential, evidence, nil)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("client.Attest(..)")
 
