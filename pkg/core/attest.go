@@ -93,6 +93,9 @@ func (ac *AttestationClient) Attest(ctx context.Context, dryRun bool) (*api.Evid
 	fwProps := firmware.GatherFirmwareData(conn, &ac.State.Config)
 	fwProps.Agent.Release = *ac.ReleaseId
 
+	// prepare hashblobs for out-of-band transfer (only include their hashes in fwPropsJSON and quoted JCS transform)
+	hashBlobs := api.StripFirmwarePropertiesHashBlobs(&fwProps)
+
 	// transform firmware info into json and crypto-safe canonical json representations
 	fwPropsJSON, err := json.Marshal(fwProps)
 	if err != nil {
@@ -192,7 +195,7 @@ func (ac *AttestationClient) Attest(ctx context.Context, dryRun bool) (*api.Evid
 	// API call
 	tui.SetUIState(tui.StSendEvidence)
 	ac.Log.Info().Msg("Sending report to immune Guard cloud")
-	attestResponse, webLink, err := ac.Client.Attest(ctx, aik.Credential, evidence, nil)
+	attestResponse, webLink, err := ac.Client.Attest(ctx, aik.Credential, evidence, hashBlobs)
 	if err != nil {
 		ac.Log.Debug().Err(err).Msg("client.Attest(..)")
 
