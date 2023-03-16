@@ -58,7 +58,7 @@ type FirmwareProperties struct {
 	SMBIOS          ErrorBuffer        `json:"smbios"`
 	TXTPublicSpace  ErrorBuffer        `json:"txt"`
 	VTdRegisterSet  ErrorBuffer        `json:"vtd"`
-	Flash           ErrorBuffer        `json:"flash"`
+	Flash           HashBlob           `json:"flash"`
 	TPM2EventLog    ErrorBuffer        `json:"event_log"`
 	TPM2EventLogZ   *ErrorBuffer       `json:"event_log_z,omitempty"`
 	PCPQuoteKeys    map[string]Buffer  `json:"pcp_quote_keys,omitempty"` // windows only
