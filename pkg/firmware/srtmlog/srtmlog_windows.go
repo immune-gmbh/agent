@@ -34,8 +34,7 @@ const (
 	regValAlternateWBCLPath = "WBCLPath" // optional
 
 	// this values hold the current OS boot and resume count under the TPM key
-	regValOsBootCount   = "OsBootCount"
-	regValOsResumeCount = "OsResumeCount" // optional
+	regValOsBootCount = "OsBootCount"
 
 	// this key holds various volatile TPM related info; relative to HKLM
 	regKeyIntegrity = "System\\CurrentControlSet\\Control\\IntegrityServices"
@@ -102,10 +101,10 @@ func getDefaultWBCLPath() (string, error) {
 	return filepath.Join(winDir, defaultWBCLSubDirectory), nil
 }
 
-func getWBCLPathAndBootCount() (string, uint64, uint64, error) {
+func getWBCLPathAndBootCount() (string, uint64, error) {
 	regKey, err := registry.OpenKey(registry.LOCAL_MACHINE, regKeyTPM, uint32(registry.QUERY_VALUE))
 	if err != nil {
-		return "", 0, 0, err
+		return "", 0, err
 	}
 	defer regKey.Close()
 
@@ -114,36 +113,32 @@ func getWBCLPathAndBootCount() (string, uint64, uint64, error) {
 	if err == registry.ErrNotExist {
 		wbclPath, err = getDefaultWBCLPath()
 		if err != nil {
-			return "", 0, 0, err
+			return "", 0, err
 		}
 	} else if err != nil {
-		return "", 0, 0, err
+		return "", 0, err
 	}
 
 	osBootCount, _, err := regKey.GetIntegerValue(regValOsBootCount)
 	if err != nil {
-		return "", 0, 0, err
+		return "", 0, err
 	}
 
-	osResumeCount, _, err := regKey.GetIntegerValue(regValOsResumeCount)
-	// if the OS can not hibernate then there is no resume count (applies to servers)
-	if err == registry.ErrNotExist {
-		osResumeCount = 0
-	} else if err != nil {
-		return "", 0, 0, err
-	}
-
-	return wbclPath, osBootCount, osResumeCount, nil
+	return wbclPath, osBootCount, nil
 }
 
-func makeWBCLFilePath(wbclPath string, bootCount, resumeCount uint32) string {
-	return filepath.Join(wbclPath, fmt.Sprintf("%010d-%010d.log", bootCount, resumeCount))
+func makeWBCLFilePattern(wbclPath string, bootCount uint32, resumeCount ...uint32) string {
+	if len(resumeCount) > 0 {
+		return filepath.Join(wbclPath, fmt.Sprintf("%010d-%010d.log", bootCount, resumeCount[0]))
+	} else {
+		return filepath.Join(wbclPath, fmt.Sprintf("%010d-??????????.log", bootCount))
+	}
 }
 
 // try to get the WBCL logs from a known location on disk
 // the disk storage is also what is used by most windows TBS functions
 func getAllWBCLLogsFromDisk() ([]byte, error) {
-	wbclPath, osBootCount, osResumeCount, err := getWBCLPathAndBootCount()
+	wbclPath, osBootCount, err := getWBCLPathAndBootCount()
 	if err != nil {
 		return nil, err
 	}
@@ -152,12 +147,9 @@ func getAllWBCLLogsFromDisk() ([]byte, error) {
 	if osBootCount > math.MaxUint32 {
 		return nil, errors.New("boot counter too large")
 	}
-	if osResumeCount > math.MaxUint16 {
-		return nil, errors.New("resume counter too large")
-	}
 
 	// see if boot log exists under current dir, otherwise try default dir
-	if _, err := os.Stat(makeWBCLFilePath(wbclPath, uint32(osBootCount), 0)); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(makeWBCLFilePattern(wbclPath, uint32(osBootCount), 0)); errors.Is(err, os.ErrNotExist) {
 		log.Trace().Msgf("srtmlog.getAllWBCLLogsFromDisk(): alternate WBCL path not working: %v", wbclPath)
 		wbclPath, err = getDefaultWBCLPath()
 		if err != nil {
@@ -169,14 +161,18 @@ func getAllWBCLLogsFromDisk() ([]byte, error) {
 	}
 
 	// see if boot log exists in default dir
-	if _, err := os.Stat(makeWBCLFilePath(wbclPath, uint32(osBootCount), 0)); err != nil {
+	if _, err := os.Stat(makeWBCLFilePattern(wbclPath, uint32(osBootCount), 0)); err != nil {
 		return nil, err
 	}
 
 	// get all logs up to the most recent resume
 	var concatWBCL []byte
-	for resume := uint32(0); resume <= uint32(osResumeCount); resume++ {
-		buf, err := os.ReadFile(makeWBCLFilePath(wbclPath, uint32(osBootCount), uint32(resume)))
+	paths, err := filepath.Glob(makeWBCLFilePattern(wbclPath, uint32(osBootCount)))
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range paths {
+		buf, err := os.ReadFile(p)
 		if err != nil {
 			return nil, err
 		}
