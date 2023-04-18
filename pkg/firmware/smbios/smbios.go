@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func ReportSMBIOS(table *api.ErrorBuffer) error {
+func ReportSMBIOS(table *api.HashBlob) error {
 	log.Trace().Msg("ReportSMBIOS()")
 
 	buf, err := readSMBIOS()
