@@ -200,8 +200,8 @@ type MemoryRange struct {
 }
 
 type ACPITables struct {
-	Tables map[string]Buffer `json:"tables,omitempty"`
-	Error  FirmwareError     `json:"error,omitempty"` // FirmwareErr*
+	Blobs map[string]HashBlob `json:"blobs,omitempty"`
+	Error FirmwareError       `json:"error,omitempty"` // FirmwareErr*
 }
 
 type ErrorBuffer struct {
