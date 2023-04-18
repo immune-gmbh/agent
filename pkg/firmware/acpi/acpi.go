@@ -16,10 +16,10 @@ func ReportACPITables(acpiTables *api.ACPITables) error {
 		log.Warn().Msg("Failed to get ACPI tables")
 		return err
 	}
-	// map map to cast []byte to api.Buffer
-	acpiTables.Tables = make(map[string]api.Buffer)
+	// map to cast []byte to api.Buffer
+	acpiTables.Blobs = make(map[string]api.HashBlob)
 	for k, v := range t {
-		acpiTables.Tables[k] = v
+		acpiTables.Blobs[k] = api.HashBlob{Data: v}
 	}
 	return nil
 }
