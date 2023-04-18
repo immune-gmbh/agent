@@ -93,8 +93,8 @@ func (ac *AttestationClient) Attest(ctx context.Context, dryRun bool) (*api.Evid
 	fwProps := firmware.GatherFirmwareData(conn, &ac.State.Config)
 	fwProps.Agent.Release = *ac.ReleaseId
 
-	// prepare hashblobs for out-of-band transfer (only include their hashes in fwPropsJSON and quoted JCS transform)
-	hashBlobs := api.StripFirmwarePropertiesHashBlobs(&fwProps)
+	// compress and prepare hashblobs for out-of-band transfer (only include their hashes in fwPropsJSON and quoted JCS transform)
+	hashBlobs := api.ProcessFirmwarePropertiesHashBlobs(&fwProps)
 
 	// transform firmware info into json and crypto-safe canonical json representations
 	fwPropsJSON, err := json.Marshal(fwProps)
