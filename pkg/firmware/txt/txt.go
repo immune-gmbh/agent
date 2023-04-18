@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func ReportTXTPublicSpace(pubSpace *api.ErrorBuffer) error {
+func ReportTXTPublicSpace(pubSpace *api.HashBlob) error {
 	log.Trace().Msg("ReportTXTPublicSpace()")
 
 	buf, err := readTXTPublicSpace()

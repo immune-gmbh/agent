@@ -55,9 +55,9 @@ type FirmwareProperties struct {
 	TPM2NVRAM       []TPM2NVIndex      `json:"tpm2_nvram,omitempty"`
 	PCIConfigSpaces []PCIConfigSpace   `json:"pci,omitempty"`
 	ACPI            ACPITables         `json:"acpi"`
-	SMBIOS          ErrorBuffer        `json:"smbios"`
-	TXTPublicSpace  ErrorBuffer        `json:"txt"`
-	VTdRegisterSet  ErrorBuffer        `json:"vtd"`
+	SMBIOS          HashBlob           `json:"smbios"`
+	TXTPublicSpace  HashBlob           `json:"txt"`
+	VTdRegisterSet  HashBlob           `json:"vtd"`
 	Flash           HashBlob           `json:"flash"`
 	TPM2EventLog    ErrorBuffer        `json:"event_log"`
 	TPM2EventLogZ   *ErrorBuffer       `json:"event_log_z,omitempty"`
