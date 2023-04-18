@@ -1,7 +1,6 @@
 package bootapps
 
 import (
-	"crypto/sha256"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -9,20 +8,14 @@ import (
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
-	"github.com/klauspost/compress/zstd"
 	"github.com/rs/zerolog/log"
 )
 
 func getBootAppMap(rootPath, mountPath string) (map[string]api.HashBlob, error) {
-	encoder, err := zstd.NewWriter(nil)
-	if err != nil {
-		return nil, err
-	}
-
 	var bootApps = make(map[string]api.HashBlob)
 	rootPath = filepath.Clean(rootPath)
 	mountPath = filepath.Clean(mountPath)
-	err = filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if path == rootPath {
 				return err
@@ -47,13 +40,9 @@ func getBootAppMap(rootPath, mountPath string) (map[string]api.HashBlob, error) 
 				return nil
 			}
 
-			// hash and compress
-			sum := sha256.Sum256(buf)
-			zbuf := encoder.EncodeAll(buf, make([]byte, 0, len(buf)))
-
 			// strip mount path prefix and only record relative path inside efi partition
 			key, _ := strings.CutPrefix(path, mountPath)
-			bootApps[key] = api.HashBlob{ZData: zbuf, Sha256: sum[:]}
+			bootApps[key] = api.HashBlob{Data: buf}
 		}
 
 		return nil

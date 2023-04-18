@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/google/jsonapi"
 	"github.com/immune-gmbh/agent/v3/pkg/typevisit"
+	"github.com/klauspost/compress/zstd"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -43,7 +45,7 @@ func errIsClientSide(err error) bool {
 	return errors.Is(err, FormatError) || errors.Is(err, AuthError) || errors.Is(err, PaymentError)
 }
 
-var blobStoreVisitor *typevisit.TypeVisitorTree
+var hashBlobVisitor *typevisit.TypeVisitorTree
 
 func init() {
 	// construct a type visitor tree for re-use
@@ -51,7 +53,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	blobStoreVisitor = tvt
+	hashBlobVisitor = tvt
 }
 
 func Cookie(rng io.Reader) (string, error) {
@@ -133,28 +135,44 @@ func (c *Client) Enroll(ctx context.Context, enrollToken string, enroll Enrollme
 	return creds, err
 }
 
-func handleHashBlob(blobs map[string][]byte, blob *HashBlob) {
+func handleHashBlob(blobs map[string][]byte, blob *HashBlob, encoder *zstd.Encoder) {
+	// only compress data if it is at least 1KiB
+	// when compression is moved from per-member to zstd compressing the whole HTTP stream then this should change as follows:
+	// only move the data to OOB when the length of the base64 encoded data would be larger than the length of the unencoded data plus the hash
+	if len(blob.Data) > 1023 && encoder != nil {
+		sum := sha256.Sum256(blob.Data)
+		blob.Sha256 = Buffer(sum[:])
+		blob.ZData = encoder.EncodeAll(blob.Data, make([]byte, 0, len(blob.Data)))
+	}
+
 	if len(blob.ZData) > 0 && len(blob.Sha256) == 32 {
 		blobs[hex.EncodeToString(blob.Sha256)] = blob.ZData
 		blob.ZData = nil
+		blob.Data = nil
 	}
 }
 
-// StripEvidenceHashBlobs strips all hash blobs from the given firmware properties only leaving their hashes; the blobs can then be transmitted out-of-band
-func StripFirmwarePropertiesHashBlobs(fw *FirmwareProperties) map[string][]byte {
+// ProcessFirmwarePropertiesHashBlobs compresses and strips hash blobs from the given firmware properties only leaving their hashes; the blobs can then be transmitted out-of-band
+func ProcessFirmwarePropertiesHashBlobs(fw *FirmwareProperties) map[string][]byte {
+	// without opts this can't err and thus the panic signals a programming error
+	encoder, err := zstd.NewWriter(nil)
+	if err != nil {
+		panic(err)
+	}
+
 	blobs := make(map[string][]byte)
-	blobStoreVisitor.Visit(fw, func(v reflect.Value, opts typevisit.FieldOpts) {
+	hashBlobVisitor.Visit(fw, func(v reflect.Value, opts typevisit.FieldOpts) {
 		// we need a special treatment for maps because there are no pointers to map elements
 		if v.Kind() == reflect.Map {
 			mi := v.MapRange()
 			for mi.Next() {
 				hb := mi.Value().Interface().(HashBlob)
-				handleHashBlob(blobs, &hb)
+				handleHashBlob(blobs, &hb, encoder)
 				v.SetMapIndex(mi.Key(), reflect.ValueOf(hb))
 			}
 		} else {
 			hb := v.Addr().Interface().(*HashBlob)
-			handleHashBlob(blobs, hb)
+			handleHashBlob(blobs, hb, encoder)
 		}
 	})
 	if len(blobs) == 0 {
