@@ -59,8 +59,9 @@ type FirmwareProperties struct {
 	TXTPublicSpace  HashBlob           `json:"txt"`
 	VTdRegisterSet  HashBlob           `json:"vtd"`
 	Flash           HashBlob           `json:"flash"`
-	TPM2EventLog    ErrorBuffer        `json:"event_log"`
-	TPM2EventLogZ   *ErrorBuffer       `json:"event_log_z,omitempty"`
+	TPM2EventLog    ErrorBuffer        `json:"event_log"`             // deprecated
+	TPM2EventLogZ   *ErrorBuffer       `json:"event_log_z,omitempty"` // deprecated
+	TPM2EventLogs   []HashBlob         `json:"event_logs,omitempty"`
 	PCPQuoteKeys    map[string]Buffer  `json:"pcp_quote_keys,omitempty"` // windows only
 	MACAddresses    MACAddresses       `json:"mac"`
 	OS              OS                 `json:"os"`

@@ -6,30 +6,30 @@ import (
 
 	"github.com/immune-gmbh/agent/v3/pkg/api"
 	"github.com/immune-gmbh/agent/v3/pkg/firmware/common"
-	"github.com/klauspost/compress/zstd"
 	"github.com/rs/zerolog/log"
 )
 
 var ErrNoEventLog = common.ErrorNoResponse(errors.New("no event log found"))
 
-func ReportTPM2EventLog(eventlog *api.ErrorBuffer, conn io.ReadWriteCloser) error {
+func ReportTPM2EventLog(eventlog *[]api.HashBlob, conn io.ReadWriteCloser) error {
 	log.Trace().Msg("ReportTPM2EventLog()")
 
-	buf, err := readTPM2EventLog(conn)
+	logBufs, err := readTPM2EventLog(conn)
 	if err != nil {
 		log.Debug().Err(err).Msg("srtmlog.ReportTPM2EventLog()")
 		log.Warn().Msg("Failed to read TPM 2.0 event log")
 		//XXX map tpmutil errors
-		eventlog.Error = common.ServeApiError(mapErrors(common.MapFSErrors(err)))
+		eventlog = &[]api.HashBlob{{Error: common.ServeApiError(mapErrors(common.MapFSErrors(err)))}}
 		return err
 	}
 
-	if len(buf) > 0 {
-		encoder, err := zstd.NewWriter(nil)
-		if err != nil {
-			return err
+	if logBufs != nil {
+		logs := make([]api.HashBlob, len(logBufs))
+		for i, buf := range logBufs {
+			logs[i] = api.HashBlob{Data: buf}
 		}
-		eventlog.Data = encoder.EncodeAll(buf, make([]byte, 0, len(buf)))
+
+		*eventlog = logs
 	}
 
 	return nil
