@@ -1,13 +1,12 @@
 package srtmlog
 
 import (
-	"encoding/binary"
 	"io"
 	"os"
 	"path"
 )
 
-func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
+func readTPM2EventLog(conn io.ReadWriteCloser) ([][]byte, error) {
 	f, ok := conn.(*os.File)
 	if ok {
 		p := path.Join("/sys/kernel/security/", path.Base(f.Name()), "/binary_bios_measurements")
@@ -15,9 +14,7 @@ func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
 		if len(buf) == 0 {
 			return nil, ErrNoEventLog
 		}
-		newBuf := make([]byte, 4)
-		binary.LittleEndian.PutUint32(newBuf, uint32(len(buf)))
-		return append(newBuf, buf...), err
+		return [][]byte{buf}, err
 	}
 
 	return nil, ErrNoEventLog

@@ -137,7 +137,7 @@ func makeWBCLFilePattern(wbclPath string, bootCount uint32, resumeCount ...uint3
 
 // try to get the WBCL logs from a known location on disk
 // the disk storage is also what is used by most windows TBS functions
-func getAllWBCLLogsFromDisk() ([]byte, error) {
+func getAllWBCLLogsFromDisk() ([][]byte, error) {
 	wbclPath, osBootCount, err := getWBCLPathAndBootCount()
 	if err != nil {
 		return nil, err
@@ -166,28 +166,24 @@ func getAllWBCLLogsFromDisk() ([]byte, error) {
 	}
 
 	// get all logs up to the most recent resume
-	var concatWBCL []byte
 	paths, err := filepath.Glob(makeWBCLFilePattern(wbclPath, uint32(osBootCount)))
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range paths {
+	allWBCLs := make([][]byte, len(paths))
+	for i, p := range paths {
 		buf, err := os.ReadFile(p)
 		if err != nil {
 			return nil, err
 		}
-
-		prefix := make([]byte, 4)
-		binary.LittleEndian.PutUint32(prefix, uint32(len(buf)))
-		concatWBCL = append(concatWBCL, prefix...)
-		concatWBCL = append(concatWBCL, buf...)
+		allWBCLs[i] = buf
 	}
 
-	return concatWBCL, nil
+	return allWBCLs, nil
 }
 
 // try to obtain WBCLs using windows API functions
-func readTPM2EventLogWinApi(conn io.ReadWriteCloser) ([]byte, error) {
+func readTPM2EventLogWinApi(conn io.ReadWriteCloser) ([][]byte, error) {
 	// Run command first with nil buffer to get required buffer size.
 	logLen, tbsErr := getAllTCGLogs(nil)
 	if tbsErr != 0 {
@@ -224,6 +220,8 @@ func readTPM2EventLogWinApi(conn io.ReadWriteCloser) ([]byte, error) {
 		break
 	}
 
+	var allWBCLs [][]byte
+
 	// fall back to just getting the current event log
 	if tbsErr == tbs.ErrInsufficientBuffer {
 		log.Debug().Msg("srtmlog.getAllTCGLogs(): failed, falling back to getting only current TCG log")
@@ -245,16 +243,31 @@ func readTPM2EventLogWinApi(conn io.ReadWriteCloser) ([]byte, error) {
 		if _, err = context.GetTCGLog(logBuffer); err != nil {
 			return nil, err
 		}
-		newBuf := make([]byte, 4)
-		binary.LittleEndian.PutUint32(newBuf, uint32(len(logBuffer)))
-		logBuffer = append(newBuf, logBuffer...)
+		allWBCLs = [][]byte{logBuffer}
+	} else {
+		// split concatenated logs into individual WBCLs
+		for len(logBuffer) > 0 {
+			// get length of current log
+			logLen := binary.LittleEndian.Uint32(logBuffer[:4])
+			if logLen == 0 {
+				return nil, ErrNoEventLog
+			} else if logLen > uint32(len(logBuffer)) {
+				return nil, io.ErrUnexpectedEOF
+			}
+
+			// add log to list
+			allWBCLs = append(allWBCLs, logBuffer[:logLen])
+
+			// move to next log
+			logBuffer = logBuffer[logLen:]
+		}
 	}
 
-	return logBuffer, nil
+	return allWBCLs, nil
 }
 
 // try to obtain current WBCL from registry
-func readTPM2EventLogRegistry() ([]byte, error) {
+func readTPM2EventLogRegistry() ([][]byte, error) {
 	regKey, err := registry.OpenKey(registry.LOCAL_MACHINE, regKeyIntegrity, uint32(registry.QUERY_VALUE))
 	if err != nil {
 		return nil, err
@@ -266,14 +279,10 @@ func readTPM2EventLogRegistry() ([]byte, error) {
 		return nil, err
 	}
 
-	newBuf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(newBuf, uint32(len(val)))
-	val = append(newBuf, val...)
-
-	return val, nil
+	return [][]byte{val}, nil
 }
 
-func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
+func readTPM2EventLog(conn io.ReadWriteCloser) ([][]byte, error) {
 	// try to get all current WBCL logs from on-disk location first
 	// this is more reliable than getAllTCGLogs() and more complete than GetTCGLog()
 	logs, err := getAllWBCLLogsFromDisk()

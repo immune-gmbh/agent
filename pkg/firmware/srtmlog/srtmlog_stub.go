@@ -9,7 +9,7 @@ import (
 	"runtime"
 )
 
-func readTPM2EventLog(conn io.ReadWriteCloser) ([]byte, error) {
+func readTPM2EventLog(conn io.ReadWriteCloser) ([][]byte, error) {
 	return nil, errors.New("srtmlog.ReadTPM2EventLog not implemented on " + runtime.GOOS)
 }
 
