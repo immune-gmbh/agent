@@ -62,7 +62,7 @@ func (av arrayVisitor) visit(v reflect.Value, opts FieldOpts, targetVisitor Targ
 }
 
 func (tvt TypeVisitorTree) newArrayVisitor(t reflect.Type, tag string) visitorFunc {
-	if t.Kind() != reflect.Array || t.Kind() != reflect.Slice {
+	if t.Kind() != reflect.Array && t.Kind() != reflect.Slice {
 		return nil
 	}
 
