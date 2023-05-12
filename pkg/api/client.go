@@ -159,6 +159,7 @@ func ProcessFirmwarePropertiesHashBlobs(fw *FirmwareProperties) map[string][]byt
 	if err != nil {
 		panic(err)
 	}
+	defer encoder.Close()
 
 	blobs := make(map[string][]byte)
 	hashBlobVisitor.Visit(fw, func(v reflect.Value, opts typevisit.FieldOpts) {
